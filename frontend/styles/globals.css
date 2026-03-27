@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --upi-green:  #00A650;
+  --upi-light:  #E6F7EE;
+  --gpay-blue:  #4285F4;
+  --phonepe-purple: #5F259F;
+  --paytm-blue: #002970;
+}

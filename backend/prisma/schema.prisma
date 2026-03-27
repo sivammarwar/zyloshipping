@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  phone        String?
+  addressJson  Json?
+  createdAt    DateTime @default(now())
+  orders       Order[]
+  reviews      Review[]
+  tickets      SupportTicket[]
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  supplierId      String
+  title           String
+  description     String   @db.Text
+  imagesJson      Json
+  price           Float
+  supplierCost    Float
+  stockQuantity   Int      @default(0)
+  category        String
+  status          String   @default("draft")
+  algoliaObjectId String?
+  createdAt       DateTime @default(now())
+  orderItems      OrderItem[]
+  reviews         Review[]
+}
+
+model Order {
+  id                  String      @id @default(cuid())
+  userId              String
+  status              String      @default("PENDING")
+  totalAmount         Float
+  shippingAddressJson Json
+  createdAt           DateTime    @default(now())
+  user                User        @relation(fields: [userId], references: [id])
+  items               OrderItem[]
+  payment             Payment?
+  commission          Commission?
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  productId      String
+  supplierId     String
+  quantity       Int
+  unitPrice      Float
+  supplierCost   Float
+  trackingNumber String?
+  order          Order   @relation(fields: [orderId], references: [id])
+  product        Product @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id               String  @id @default(cuid())
+  orderId          String  @unique
+  gateway          String                   // 'razorpay' | 'stripe'
+  gatewayPaymentId String
+  gatewayOrderId   String?                  // Razorpay order ID
+  amount           Float
+  amountPaise      Int                      // Exact paise value stored for audit
+  currency         String  @default("INR")
+  method           String?                  // 'upi' | 'card' | 'netbanking' | 'wallet' | 'emi'
+  upiVpa           String?                  // e.g. user@okaxis (only for UPI)
+  upiApp           String?                  // 'gpay' | 'phonepe' | 'paytm' | 'bhim'
+  status           String  @default("pending")
+  webhookDataJson  Json?
+  createdAt        DateTime @default(now())
+  order            Order   @relation(fields: [orderId], references: [id])
+}
+
+model Commission {
+  id            String @id @default(cuid())
+  orderId       String @unique
+  revenue       Float
+  supplierCost  Float
+  gatewayFee    Float
+  netCommission Float
+  order         Order  @relation(fields: [orderId], references: [id])
+}
+
+model SupportTicket {
+  id         String   @id @default(cuid())
+  userId     String
+  orderId    String?
+  message    String   @db.Text
+  aiResponse String?  @db.Text
+  status     String   @default("open")
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String
+  rating    Int
+  text      String?  @db.Text
+  aiReply   String?  @db.Text
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model AiLog {
+  id         String   @id @default(cuid())
+  agentName  String
+  inputJson  Json
+  outputJson Json
+  tokensUsed Int
+  latencyMs  Int
+  createdAt  DateTime @default(now())
+}
