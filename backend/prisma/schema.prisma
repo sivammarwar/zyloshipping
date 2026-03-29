@@ -1,125 +1,774 @@
+// ─────────────────────────────────────────────────────────────
+// ZyloShipping — Prisma Schema
+// Matches all UI data shapes across dashboard pages:
+//   Dashboard, Orders, Products, Suppliers, Analytics,
+//   AI Agents, Settings, Cart (admin orders + abandoned carts)
+// ─────────────────────────────────────────────────────────────
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Supabase requires this for migrations
 }
+
+// ═══════════════════════════════════════════════════════════════
+// USERS & AUTH
+// ═══════════════════════════════════════════════════════════════
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
   name         String?
   phone        String?
-  addressJson  Json?
-  createdAt    DateTime @default(now())
-  orders       Order[]
-  reviews      Review[]
-  tickets      SupportTicket[]
+  addressJson  Json?     @map("address_json")
+  role         UserRole  @default(CUSTOMER)
+  isActive     Boolean   @default(true) @map("is_active")
+  totpSecret   String?   @map("totp_secret")
+  totpEnabled  Boolean   @default(false) @map("totp_enabled")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  orders        Order[]
+  reviews       Review[]
+  tickets       SupportTicket[]
+  sessions      Session[]
+  cart          Cart?
+  adminCart     AdminCart?
+  passwordResets PasswordResetToken[]
+  adminLogs      AdminLog[]
+
+  @@map("users")
 }
 
-model Product {
-  id              String   @id @default(cuid())
-  supplierId      String
-  title           String
-  description     String   @db.Text
-  imagesJson      Json
-  price           Float
-  supplierCost    Float
-  stockQuantity   Int      @default(0)
-  category        String
-  status          String   @default("draft")
-  algoliaObjectId String?
-  createdAt       DateTime @default(now())
-  orderItems      OrderItem[]
-  reviews         Review[]
+model AdminLog {
+  id          String   @id @default(cuid())
+  adminId     String   @map("admin_id")
+  action      String
+  resource    String
+  resourceId  String?  @map("resource_id")
+  ipAddress   String?  @map("ip_address")
+  metaJson    Json?    @map("meta_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([createdAt])
+  @@index([resource, resourceId])
+  @@map("admin_logs")
 }
+
+model InventoryAlertDismissal {
+  id         String   @id @default(cuid())
+  productId  String   @unique @map("product_id")
+  adminId    String   @map("admin_id")
+  dismissedAt DateTime @default(now()) @map("dismissed_at")
+
+  @@map("inventory_alert_dismissals")
+}
+
+model ProductMetricAudit {
+  id         String   @id @default(cuid())
+  productId  String   @map("product_id")
+  kind       String   // 'price' | 'stock'
+  value      Float
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  @@index([productId])
+  @@index([recordedAt])
+  @@map("product_metric_audits")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Admin team members (maps to Settings → Team tab)
+model TeamMember {
+  id         String     @id @default(cuid())
+  name       String
+  email      String     @unique
+  role       AdminRole  @default(EDITOR)
+  avatar     String?    // 2-letter initials
+  color      String?    // hex color for avatar bg
+  lastActive DateTime?  @map("last_active")
+  isActive   Boolean    @default(true) @map("is_active")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  @@map("team_members")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCTS
+// ═══════════════════════════════════════════════════════════════
+
+model Product {
+  id              String        @id @default(cuid())
+  supplierId      String        @map("supplier_id")        // 'aliexpress' | 'cj'
+  supplierSku     String?       @map("supplier_sku")       // e.g. AE-78432
+  sku             String        @unique                     // e.g. ZY-ELEC-001
+  slug            String        @unique                     // URL slug, SEO
+  title           String
+  description     String        @db.Text
+  imagesJson      Json          @map("images_json")        // string[]
+  price           Float                                     // selling price
+  supplierCost    Float         @map("supplier_cost")      // cost from supplier
+  stockQuantity   Int           @default(0) @map("stock_quantity")
+  category        String
+  status          ProductStatus @default(DRAFT)
+  rating          Float         @default(0)
+  totalSales      Int           @default(0) @map("total_sales")
+  algoliaObjectId String?       @map("algolia_object_id")
+
+  // AI-generated fields
+  aiTitle         String?       @db.Text @map("ai_title")
+  aiDescription   String?       @db.Text @map("ai_description")
+  aiMetaTags      Json?         @map("ai_meta_tags")       // string[]
+  lastAiRun       DateTime?     @map("last_ai_run")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  supplier   Supplier    @relation(fields: [supplierId], references: [id])
+  orderItems OrderItem[]
+  reviews    Review[]
+  cartItems  CartItem[]
+  adminCartItems AdminCartItem[]
+  pipelineItem ProductPipeline?
+
+  @@index([status, category])
+  @@index([supplierId, status])
+  @@map("products")
+}
+
+// Product ingestion pipeline (Suppliers → Pipeline tab)
+model ProductPipeline {
+  id             String         @id @default(cuid())
+  productId      String         @unique @map("product_id")
+  supplierSku    String         @map("supplier_sku")       // e.g. AE-78432
+  supplierName   String         @map("supplier_name")      // 'AliExpress' | 'CJ'
+  name           String
+  category       String
+  cost           Float
+  suggestedPrice Float          @map("suggested_price")
+  margin         Int            // percentage
+  status         PipelineStatus @default(PENDING_REVIEW)
+  aiScore        Float?         @map("ai_score")           // curation score 0-100
+  rejectedReason String?        @map("rejected_reason")
+  reviewedBy     String?        @map("reviewed_by")
+  reviewedAt     DateTime?      @map("reviewed_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("product_pipeline")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPPLIERS
+// ═══════════════════════════════════════════════════════════════
+
+model Supplier {
+  id              String   @id                              // 'aliexpress' | 'cj'
+  name            String                                    // 'AliExpress' | 'CJ Dropshipping'
+  logo            String                                    // 2-letter code e.g. 'AE'
+  logoColor       String   @map("logo_color")              // hex color
+  status          String   @default("connected")
+  apiKey          String?  @map("api_key")
+  apiSecret       String?  @map("api_secret")
+  accessToken     String?  @map("access_token")
+  webhookSecret   String?  @map("webhook_secret")
+
+  // Stats (updated on each sync)
+  totalProducts   Int      @default(0) @map("total_products")
+  activeProducts  Int      @default(0) @map("active_products")
+  pendingOrders   Int      @default(0) @map("pending_orders")
+  totalOrders     Int      @default(0) @map("total_orders")
+  avgDeliveryDays Int      @default(14) @map("avg_delivery_days")
+  rating          Float    @default(4.0)
+  responseTimeMs  Int      @default(1200) @map("response_time_ms")
+  uptimePercent   Float    @default(99.0) @map("uptime_percent")
+  lastSyncAt      DateTime? @map("last_sync_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  products   Product[]
+  orderItems OrderItem[]
+
+  @@map("suppliers")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ORDERS
+// ═══════════════════════════════════════════════════════════════
 
 model Order {
   id                  String      @id @default(cuid())
-  userId              String
-  status              String      @default("PENDING")
-  totalAmount         Float
-  shippingAddressJson Json
-  createdAt           DateTime    @default(now())
-  user                User        @relation(fields: [userId], references: [id])
-  items               OrderItem[]
-  payment             Payment?
-  commission          Commission?
+  orderNumber         String      @unique @map("order_number") // e.g. ZY-28431
+  userId              String      @map("user_id")
+  status              OrderStatus @default(PENDING)
+  totalAmount         Float       @map("total_amount")
+  shippingAddressJson Json        @map("shipping_address_json")
+  country             String?                                   // for Orders table UI
+  paymentMethod       String?     @map("payment_method")       // 'UPI' | 'Card' | 'NetBank' | 'Wallet'
+  gateway             String?                                   // 'Razorpay' | 'Stripe'
+  note                String?     @db.Text
+  couponCode          String?     @map("coupon_code")
+  discountAmount      Float       @default(0) @map("discount_amount")
+  shippingAmount      Float       @default(9.99) @map("shipping_amount")
+  isAdminOrder        Boolean     @default(false) @map("is_admin_order") // from admin cart
+
+  /// Routing agent / failover: primary supplier chosen for submission
+  selectedSupplierId String?   @map("selected_supplier_id") // 'aliexpress' | 'cj'
+  /// When the order was marked delivered (AfterShip / manual)
+  deliveredAt        DateTime? @map("delivered_at")
+  /// Automation paused after repeated supplier failures (manual resume)
+  automationPausedAt DateTime? @map("automation_paused_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user            User                 @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  payment         Payment?
+  commission      Commission?
+  tracking        OrderTracking[]
+  transitionLogs  OrderTransitionLog[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("orders")
 }
 
 model OrderItem {
   id             String  @id @default(cuid())
-  orderId        String
-  productId      String
-  supplierId     String
+  orderId        String  @map("order_id")
+  productId      String  @map("product_id")
+  supplierId     String  @map("supplier_id")
   quantity       Int
-  unitPrice      Float
-  supplierCost   Float
-  trackingNumber String?
-  order          Order   @relation(fields: [orderId], references: [id])
-  product        Product @relation(fields: [productId], references: [id])
+  unitPrice      Float   @map("unit_price")
+  supplierCost   Float   @map("supplier_cost")
+  trackingNumber String? @map("tracking_number")
+  supplierOrderId String? @map("supplier_order_id")
+  /// AfterShip checkpoints + supplier events (append-only style snapshots)
+  trackingEventsJson Json? @map("tracking_events_json")
+
+  order   Order    @relation(fields: [orderId], references: [id])
+  product Product  @relation(fields: [productId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("order_items")
 }
+
+model OrderTransitionLog {
+  id         String      @id @default(cuid())
+  orderId    String      @map("order_id")
+  fromStatus OrderStatus @map("from_status")
+  toStatus   OrderStatus @map("to_status")
+  reason     String
+  metaJson   Json?       @map("meta_json")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_transition_logs")
+}
+
+model OrderTracking {
+  id          String   @id @default(cuid())
+  orderId     String   @map("order_id")
+  status      String
+  location    String?
+  description String?
+  timestamp   DateTime
+  source      String   @default("aftership") // 'aftership' | '17track' | 'manual'
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("order_tracking")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAYMENTS
+// ═══════════════════════════════════════════════════════════════
 
 model Payment {
   id               String  @id @default(cuid())
-  orderId          String  @unique
-  gateway          String                   // 'razorpay' | 'stripe'
-  gatewayPaymentId String
-  gatewayOrderId   String?                  // Razorpay order ID
-  amount           Float
-  amountPaise      Int                      // Exact paise value stored for audit
+  orderId          String  @unique @map("order_id")
+  gateway          String                          // 'razorpay' | 'stripe'
+  gatewayPaymentId String  @map("gateway_payment_id")
+  gatewayOrderId   String? @map("gateway_order_id") // Razorpay order ID
+  amount           Float                            // INR
+  amountPaise      Int     @map("amount_paise")     // exact paise for audit
   currency         String  @default("INR")
-  method           String?                  // 'upi' | 'card' | 'netbanking' | 'wallet' | 'emi'
-  upiVpa           String?                  // e.g. user@okaxis (only for UPI)
-  upiApp           String?                  // 'gpay' | 'phonepe' | 'paytm' | 'bhim'
-  status           String  @default("pending")
-  webhookDataJson  Json?
-  createdAt        DateTime @default(now())
-  order            Order   @relation(fields: [orderId], references: [id])
+  method           String?                          // 'upi' | 'card' | 'netbanking' | 'wallet' | 'emi'
+  upiVpa           String? @map("upi_vpa")          // e.g. user@okaxis
+  upiApp           String? @map("upi_app")          // 'gpay' | 'phonepe' | 'paytm' | 'bhim'
+  status           String  @default("pending")      // 'pending' | 'captured' | 'failed' | 'refunded'
+  webhookDataJson  Json?   @map("webhook_data_json")
+  refundId         String? @map("refund_id")
+  refundAmount     Float?  @map("refund_amount")
+  refundedAt       DateTime? @map("refunded_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
 }
 
 model Commission {
   id            String @id @default(cuid())
-  orderId       String @unique
+  orderId       String @unique @map("order_id")
   revenue       Float
-  supplierCost  Float
-  gatewayFee    Float
-  netCommission Float
-  order         Order  @relation(fields: [orderId], references: [id])
+  supplierCost  Float  @map("supplier_cost")
+  gatewayFee    Float  @map("gateway_fee")
+  shippingCost  Float  @default(0) @map("shipping_cost")
+  netCommission Float  @map("net_commission")
+  marginPercent Float  @map("margin_percent")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("commissions")
 }
 
-model SupportTicket {
-  id         String   @id @default(cuid())
-  userId     String
-  orderId    String?
-  message    String   @db.Text
-  aiResponse String?  @db.Text
-  status     String   @default("open")
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
+// ═══════════════════════════════════════════════════════════════
+// CART (Customer-facing — Redis-backed, PostgreSQL for persistence)
+// ═══════════════════════════════════════════════════════════════
+
+model Cart {
+  id         String     @id @default(cuid())
+  userId     String     @unique @map("user_id")
+  couponCode String?    @map("coupon_code")
+  note       String?    @db.Text
+  status     CartStatus @default(ACTIVE)
+
+  // Abandoned cart tracking
+  abandonedAt    DateTime? @map("abandoned_at")
+  recoveryEmailSentAt DateTime? @map("recovery_email_sent_at")
+  recoveredAt    DateTime? @map("recovered_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User       @relation(fields: [userId], references: [id])
+  items CartItem[]
+
+  @@map("carts")
 }
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String @map("cart_id")
+  productId String @map("product_id")
+  quantity  Int    @default(1)
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN CART (Admin orders + abandoned cart monitoring)
+// Powers the new /dashboard/cart page
+// ═══════════════════════════════════════════════════════════════
+
+model AdminCart {
+  id          String      @id @default(cuid())
+  adminUserId String      @unique @map("admin_user_id")
+  couponCode  String?     @map("coupon_code")
+  note        String?     @db.Text
+  status      CartStatus  @default(ACTIVE)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  adminUser User           @relation(fields: [adminUserId], references: [id])
+  items     AdminCartItem[]
+
+  @@map("admin_carts")
+}
+
+model AdminCartItem {
+  id          String   @id @default(cuid())
+  adminCartId String   @map("admin_cart_id")
+  productId   String   @map("product_id")
+  quantity    Int      @default(1)
+  savedForLater Boolean @default(false) @map("saved_for_later")
+  addedAt     DateTime @default(now()) @map("added_at")
+
+  adminCart AdminCart @relation(fields: [adminCartId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@unique([adminCartId, productId])
+  @@map("admin_cart_items")
+}
+
+// Abandoned cart view for admin monitoring dashboard
+// (populated from Cart model — queries carts where status=ABANDONED)
+model AbandonedCartSnapshot {
+  id            String   @id @default(cuid())
+  cartId        String   @map("cart_id")
+  userId        String   @map("user_id")
+  userEmail     String   @map("user_email")
+  userName      String?  @map("user_name")
+  itemCount     Int      @map("item_count")
+  cartValue     Float    @map("cart_value")
+  abandonedAt   DateTime @map("abandoned_at")
+  itemsJson     Json     @map("items_json")   // snapshot of items at abandonment
+  recoveryStatus String  @default("pending") @map("recovery_status") // 'pending'|'email_sent'|'recovered'|'expired'
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("abandoned_cart_snapshots")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPPORT
+// ═══════════════════════════════════════════════════════════════
+
+model SupportTicket {
+  id         String        @id @default(cuid())
+  ticketNumber String      @unique @map("ticket_number") // e.g. #2841
+  userId     String        @map("user_id")
+  orderId    String?       @map("order_id")
+  message    String        @db.Text
+  aiResponse String?       @db.Text @map("ai_response")
+  adminResponse String?   @db.Text @map("admin_response")
+  status     TicketStatus  @default(OPEN)
+  escalated  Boolean       @default(false)
+  escalatedReason String?  @db.Text @map("escalated_reason")
+  resolvedAt DateTime?     @map("resolved_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("support_tickets")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REVIEWS
+// ═══════════════════════════════════════════════════════════════
 
 model Review {
   id        String   @id @default(cuid())
-  productId String
-  userId    String
-  rating    Int
+  productId String   @map("product_id")
+  userId    String   @map("user_id")
+  rating    Int                          // 1-5
   text      String?  @db.Text
-  aiReply   String?  @db.Text
-  createdAt DateTime @default(now())
-  product   Product  @relation(fields: [productId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  aiReply   String?  @db.Text @map("ai_reply")
+  aiRepliedAt DateTime? @map("ai_replied_at")
+  isFlagged Boolean  @default(false) @map("is_flagged")
+  flagReason String?  @map("flag_reason")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("reviews")
 }
 
+// ═══════════════════════════════════════════════════════════════
+// AI AGENTS (matches Agents dashboard page exactly)
+// ═══════════════════════════════════════════════════════════════
+
+model AgentRun {
+  id          String      @id @default(cuid())
+  agentId     String      @map("agent_id")      // 'content' | 'curation' | 'pricing' | 'routing' | 'support' | 'refund' | 'reviews' | 'health'
+  agentName   String      @map("agent_name")
+  status      AgentStatus @default(RUNNING)
+  model       String                             // 'gpt-4o' | 'gpt-4o-mini'
+  inputJson   Json        @map("input_json")
+  outputJson  Json?       @map("output_json")
+  tokensUsed  Int         @default(0) @map("tokens_used")
+  latencyMs   Int         @default(0) @map("latency_ms")
+  errorMsg    String?     @map("error_msg")
+  triggeredBy String      @default("cron") @map("triggered_by") // 'cron' | 'webhook' | 'manual'
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  logs AgentLog[]
+
+  @@map("agent_runs")
+}
+
+model AgentLog {
+  id         String      @id @default(cuid())
+  agentRunId String      @map("agent_run_id")
+  agentId    String      @map("agent_id")
+  logType    AgentLogType @map("log_type")     // 'info' | 'success' | 'error' | 'warn'
+  message    String      @db.Text
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  agentRun AgentRun @relation(fields: [agentRunId], references: [id])
+
+  @@map("agent_logs")
+}
+
+// Current state of each agent (for the status cards UI)
+model AgentState {
+  id           String      @id                  // matches agent id: 'content', 'pricing' etc
+  name         String
+  description  String      @db.Text
+  status       AgentStatus @default(IDLE)
+  schedule     String                           // 'Every 6h' | 'Real-time' etc
+  model        String
+  lastRunAt    DateTime?   @map("last_run_at")
+  nextRunAt    DateTime?   @map("next_run_at")
+  totalCalls   Int         @default(0) @map("total_calls")
+  tokensTodayK Int         @default(0) @map("tokens_today_k") // stored as int (28 = 28k)
+  successRate  Float       @default(100) @map("success_rate")
+  avgLatencyMs Int         @default(0) @map("avg_latency_ms")
+  isPaused     Boolean     @default(false) @map("is_paused")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@map("agent_states")
+}
+
+/// Append-only log for every AI invocation (user requirement: ai_logs)
 model AiLog {
-  id         String   @id @default(cuid())
-  agentName  String
-  inputJson  Json
-  outputJson Json
-  tokensUsed Int
-  latencyMs  Int
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  agentName String   @map("agent_name")
+  inputJson Json     @map("input_json")
+  outputJson Json?   @map("output_json")
+  tokensUsed Int     @default(0) @map("tokens_used")
+  latencyMs Int      @default(0) @map("latency_ms")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([agentName, createdAt])
+  @@map("ai_logs")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANALYTICS (pre-aggregated for dashboard performance)
+// ═══════════════════════════════════════════════════════════════
+
+model DailyAnalytics {
+  id            String   @id @default(cuid())
+  date          DateTime @unique @db.Date        // just the date
+  revenue       Float    @default(0)
+  orders        Int      @default(0)
+  aov           Float    @default(0) @map("aov") // avg order value
+  visitors      Int      @default(0)
+  conversionRate Float   @default(0) @map("conversion_rate")
+  supplierCosts Float    @default(0) @map("supplier_costs")
+  netProfit     Float    @default(0) @map("net_profit")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  productStats  ProductDailyStat[]
+  geoStats      GeoDailyStat[]
+
+  @@map("daily_analytics")
+}
+
+model ProductDailyStat {
+  id          String @id @default(cuid())
+  analyticsId String @map("analytics_id")
+  productId   String @map("product_id")
+  productName String @map("product_name")
+  revenue     Float  @default(0)
+  orders      Int    @default(0)
+  growth      Float  @default(0)   // % change vs prev period
+
+  analytics DailyAnalytics @relation(fields: [analyticsId], references: [id])
+
+  @@map("product_daily_stats")
+}
+
+model GeoDailyStat {
+  id          String @id @default(cuid())
+  analyticsId String @map("analytics_id")
+  country     String
+  countryFlag String @map("country_flag")
+  revenue     Float  @default(0)
+  pct         Float  @default(0)    // % of total revenue
+
+  analytics DailyAnalytics @relation(fields: [analyticsId], references: [id])
+
+  @@map("geo_daily_stats")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STORE SETTINGS (matches Settings page tabs)
+// ═══════════════════════════════════════════════════════════════
+
+model StoreSettings {
+  id        String @id @default("singleton")   // single row
+
+  // General tab
+  storeName   String @default("ZyloShipping") @map("store_name")
+  contactEmail String @default("hello@zyloshipping.com") @map("contact_email")
+  timezone    String @default("Asia/Kolkata")
+  currency    String @default("INR")
+
+  // Store tab
+  storeUrl       String @default("zyloshipping.com") @map("store_url")
+  tagline        String @default("World's Fastest Dropshipping")
+  supportEmail   String @default("support@zyloshipping.com") @map("support_email")
+  maintenanceMode Boolean @default(false) @map("maintenance_mode")
+
+  // Notifications
+  emailOrders   Boolean @default(true) @map("email_orders")
+  emailLowStock Boolean @default(true) @map("email_low_stock")
+  emailRefunds  Boolean @default(false) @map("email_refunds")
+  smsOrders     Boolean @default(false) @map("sms_orders")
+
+  // Shipping tab
+  freeShippingThreshold Float @default(200) @map("free_shipping_threshold")
+  defaultShippingRate   Float @default(9.99) @map("default_shipping_rate")
+  processingDays        Int   @default(1) @map("processing_days")
+
+  // Pricing rules
+  markupPercent Float @default(2.5) @map("markup_percent")
+  priceFloor    Float @default(99) @map("price_floor")
+  priceCeiling  Float @default(99999) @map("price_ceiling")
+
+  // Coupon
+  activeCouponCode    String? @map("active_coupon_code")
+  couponDiscountPct   Float   @default(10) @map("coupon_discount_pct")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("store_settings")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  name      String
+  keyHash   String   @unique @map("key_hash")   // hashed, never stored plain
+  keyPrefix String   @map("key_prefix")          // e.g. zk_live_••••3f2a (for display)
+  status    String   @default("active")           // 'active' | 'idle' | 'revoked'
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("api_keys")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  OWNER
+}
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  EDITOR
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  HIDDEN
+  LOW   // auto-set when stock < 10
+  ARCHIVED
+}
+
+enum PipelineStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING
+  PAYMENT_CONFIRMED
+  SUBMITTED_TO_SUPPLIER
+  SUPPLIER_CONFIRMED
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  COMPLETED
+  REFUND_REQUESTED
+  REFUNDED
+  CANCELLED
+}
+
+enum CartStatus {
+  ACTIVE
+  ABANDONED
+  CHECKED_OUT
+  EXPIRED
+}
+
+enum TicketStatus {
+  OPEN
+  AI_RESPONDED
+  IN_PROGRESS
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+enum AgentStatus {
+  RUNNING
+  IDLE
+  ERROR
+  PAUSED
+  DISABLED
+}
+
+enum AgentLogType {
+  INFO
+  SUCCESS
+  ERROR
+  WARN
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRICING PLANS
+// ═══════════════════════════════════════════════════════════════
+
+model PricingPlan {
+  id          String   @id @default(cuid())
+  planId      String   @unique @map("plan_id") // 'starter', 'growth', 'pro'
+  name        String
+  tagline     String
+  monthlyPrice Int     @map("monthly_price") // in paise/cents
+  annualPrice  Int     @map("annual_price")  // in paise/cents
+  isHighlight  Boolean @default(false) @map("is_highlight")
+  badge        String?
+  ctaText      String  @map("cta_text")
+  features     Json    // array of feature strings
+  limits       Json    // array of limit strings
+  isActive     Boolean @default(true) @map("is_active")
+  displayOrder Int     @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("pricing_plans")
 }

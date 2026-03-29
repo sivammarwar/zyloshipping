@@ -1,13 +1,18 @@
 {
   "name": "zyloshipping",
   "private": true,
-  "workspaces": ["frontend", "backend", "shared"],
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
   "scripts": {
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend":  "cd backend && npm run dev",
-    "dev":          "concurrently \"npm run dev:frontend\" \"npm run dev:backend\""
+    "dev:backend": "cd backend && npm run dev",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\""
   },
   "devDependencies": {
+    "@types/node-cron": "^3.0.11",
     "concurrently": "^8.2.0"
   }
 }

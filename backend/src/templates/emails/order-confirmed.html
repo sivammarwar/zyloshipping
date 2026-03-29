@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+    <h1>Order confirmed</h1>
+    <p>Thank you! Order <strong>{{orderNumber}}</strong> is confirmed.</p>
+    <p>Total: <strong>{{total}}</strong> (incl. shipping where applicable)</p>
+    <p>Estimated delivery: {{eta}}</p>
+    <table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%;">
+      <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+      <tbody>{{itemsRows}}</tbody>
+    </table>
+    <p>— ZyloShipping</p>
+  </body>
+</html>

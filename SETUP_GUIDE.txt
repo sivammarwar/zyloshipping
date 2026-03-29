@@ -1,0 +1,1042 @@
+================================================================================
+                    ZYLOSHIPPING - COMPLETE SETUP GUIDE
+                    Step-by-Step Instructions to Make It 100% Functional
+================================================================================
+
+This guide will take you from a fresh clone to a fully working, deployed 
+ZyloShipping platform. Follow each step carefully.
+
+================================================================================
+PREREQUISITES - GET THESE FIRST
+================================================================================
+
+Before starting, you need:
+
+1. Node.js 20+ installed
+   Download: https://nodejs.org/
+   Verify: node --version (should show v20.x.x or higher)
+
+2. PostgreSQL database
+   Option A: Supabase (Recommended - Free tier)
+     - Go to https://supabase.com
+     - Create account
+     - Create new project
+     - Get connection string from Settings > Database
+   
+   Option B: Railway (Easy setup)
+     - Go to https://railway.app
+     - Create account
+     - Add PostgreSQL plugin
+     - Get connection string
+   
+   Option C: Local PostgreSQL
+     - Install PostgreSQL 16
+     - Create database: createdb zyloshipping
+
+3. Redis instance
+   Option A: Upstash (Recommended - Free tier)
+     - Go to https://upstash.com
+     - Create account
+     - Create Redis database
+     - Get connection string (redis://...)
+   
+   Option B: Railway
+     - Add Redis plugin
+     - Get connection string
+   
+   Option C: Local Redis
+     - Install Redis 7
+     - Start: redis-server
+     - URL: redis://localhost:6379
+
+4. Groq API Key (FREE - Primary AI provider)
+   - Go to https://console.groq.com
+   - Create account
+   - Generate API key
+   - Free tier: 14,400 requests/day
+   - IMPORTANT: This is your main AI provider (free!)
+
+5. Payment Gateway Accounts
+   Razorpay (India):
+     - Go to https://razorpay.com
+     - Create account
+     - Get test keys from Dashboard > Settings > API Keys
+   
+   Stripe (International):
+     - Go to https://stripe.com
+     - Create account
+     - Get test keys from Developers > API Keys
+
+6. Algolia Account (Product Search)
+   - Go to https://algolia.com
+   - Create account (free tier)
+   - Create application
+   - Get: App ID, Admin API Key, Search-Only API Key
+
+7. Resend Account (Email Service)
+   - Go to https://resend.com
+   - Create account (free tier: 100 emails/day)
+   - Get API key
+
+8. OPTIONAL Services (can add later):
+   - OpenAI API Key (fallback AI, paid)
+   - AfterShip API Key (shipment tracking)
+   - AliExpress API Key (product sourcing)
+   - CJ Dropshipping API Key (product sourcing)
+
+================================================================================
+STEP 1: INSTALL POSTGRESQL & REDIS (LOCAL DEVELOPMENT)
+================================================================================
+
+OPTION A: Using Docker (Easiest - Recommended)
+-----------------------------------------------
+If you have Docker installed, this is the simplest way:
+
+1. Make sure Docker Desktop is running
+
+2. Use the provided docker-compose.yml:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping
+   docker-compose up -d postgres redis
+   
+   This starts:
+   - PostgreSQL on port 5432
+   - Redis on port 6379
+
+3. Verify they're running:
+   docker ps
+   
+   Should show both containers running
+
+4. Your connection strings will be:
+   DATABASE_URL="postgresql://zyloshipping:zyloshipping_dev_password@localhost:5432/zyloshipping?schema=public"
+   REDIS_URL="redis://localhost:6379"
+
+5. To stop them later:
+   docker-compose down
+
+6. To view logs:
+   docker-compose logs postgres
+   docker-compose logs redis
+
+OPTION B: Install PostgreSQL Locally (macOS)
+---------------------------------------------
+1. Install PostgreSQL using Homebrew:
+   brew install postgresql@16
+
+2. Start PostgreSQL service:
+   brew services start postgresql@16
+
+3. Create database and user:
+   # Connect to PostgreSQL
+   psql postgres
+   
+   # In psql prompt, run:
+   CREATE DATABASE zyloshipping;
+   CREATE USER zyloshipping WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE zyloshipping TO zyloshipping;
+   \q
+
+4. Your connection string:
+   DATABASE_URL="postgresql://zyloshipping:your_password@localhost:5432/zyloshipping?schema=public"
+
+5. To stop PostgreSQL:
+   brew services stop postgresql@16
+
+6. To check if running:
+   brew services list
+
+OPTION C: Install Redis Locally (macOS)
+----------------------------------------
+1. Install Redis using Homebrew:
+   brew install redis
+
+2. Start Redis service:
+   brew services start redis
+
+3. Verify Redis is running:
+   redis-cli ping
+   # Should return: PONG
+
+4. Your connection string:
+   REDIS_URL="redis://localhost:6379"
+
+5. To stop Redis:
+   brew services stop redis
+
+6. To check Redis data:
+   redis-cli
+   # In redis-cli:
+   KEYS *
+   GET some_key
+   exit
+
+OPTION D: Use Cloud Services (No Local Install)
+------------------------------------------------
+Skip local installation and use cloud services:
+
+PostgreSQL - Supabase (Free):
+1. Go to https://supabase.com
+2. Create account and new project
+3. Wait for database to provision (~2 minutes)
+4. Go to Settings > Database
+5. Copy "Connection string" (URI format)
+6. Replace [YOUR-PASSWORD] with your actual password
+   Example: postgresql://postgres:your_password@db.xxx.supabase.co:5432/postgres
+
+Redis - Upstash (Free):
+1. Go to https://upstash.com
+2. Create account
+3. Create new Redis database
+4. Copy the Redis URL
+   Example: redis://default:your_password@xxx.upstash.io:6379
+
+VERIFICATION:
+-------------
+Test PostgreSQL connection:
+   psql "postgresql://zyloshipping:password@localhost:5432/zyloshipping"
+   # Should connect without errors
+   \q to exit
+
+Test Redis connection:
+   redis-cli -u redis://localhost:6379 ping
+   # Should return: PONG
+
+================================================================================
+STEP 2: CLONE & INSTALL DEPENDENCIES
+================================================================================
+
+1. Navigate to project directory:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping
+
+2. Install all dependencies:
+   npm install
+
+   This installs dependencies for both backend and frontend.
+   Wait for installation to complete (~2-3 minutes)
+
+3. Verify installation:
+   # Check backend dependencies
+   cd backend
+   ls node_modules
+   
+   # Check frontend dependencies
+   cd ../frontend
+   ls node_modules
+
+================================================================================
+STEP 3: BACKEND CONFIGURATION
+================================================================================
+
+1. Navigate to backend:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping/backend
+
+2. Copy environment template:
+   cp .env.example .env
+
+3. Open .env file in your editor:
+   nano .env
+   # or use VS Code, any text editor
+
+4. Fill in REQUIRED variables (copy from your accounts):
+
+   # Database (from Supabase/Railway)
+   DATABASE_URL="postgresql://user:password@host:5432/database?schema=public"
+   
+   # Redis (from Upstash/Railway)
+   REDIS_URL="redis://default:password@host:6379"
+   
+   # Server
+   PORT=4000
+   NODE_ENV=development
+   FRONTEND_URL=http://localhost:3000
+   
+   # JWT Secrets (generate random 32+ character strings)
+   # You can use: openssl rand -base64 32
+   JWT_SECRET="your-super-secret-jwt-key-min-32-chars-change-this"
+   JWT_REFRESH_SECRET="your-different-refresh-key-min-32-chars-change-this"
+   
+   # Groq AI (FREE - your main AI provider)
+   GROQ_API_KEY="gsk_your_actual_groq_api_key_here"
+   
+   # Algolia (for product search)
+   ALGOLIA_APP_ID="your_algolia_app_id"
+   ALGOLIA_ADMIN_KEY="your_algolia_admin_key"
+   ALGOLIA_SEARCH_KEY="your_algolia_search_only_key"
+   
+   # Razorpay (payment gateway)
+   RAZORPAY_KEY_ID="rzp_test_your_key_id"
+   RAZORPAY_KEY_SECRET="your_razorpay_secret"
+   
+   # Stripe (payment gateway)
+   STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+   STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret"
+   
+   # Resend (email service)
+   RESEND_API_KEY="re_your_resend_api_key"
+   
+   # Encryption (generate random 32 character string)
+   ENCRYPTION_KEY="your-32-character-encryption-key"
+   
+   # Admin credentials (for seed script)
+   ADMIN_EMAIL="admin@zyloshipping.com"
+   ADMIN_PASSWORD="@3088shivA+her"
+
+5. OPTIONAL variables (can add later):
+   OPENAI_API_KEY="sk_your_openai_key"  # Fallback AI (paid)
+   AFTERSHIP_API_KEY="your_aftership_key"  # Tracking
+   ALIEXPRESS_API_KEY="your_aliexpress_key"  # Product sourcing
+   CJ_DROPSHIPPING_API_KEY="your_cj_key"  # Product sourcing
+
+6. Save the .env file
+
+================================================================================
+STEP 4: DATABASE SETUP
+================================================================================
+
+1. Make sure you're in backend directory:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping/backend
+
+2. Generate Prisma Client:
+   npx prisma generate
+   
+   This generates TypeScript types from your schema.
+   You should see: "✔ Generated Prisma Client"
+
+3. Push database schema (creates all tables):
+   npx prisma db push
+   
+   This creates all tables: User, Product, Order, Cart, etc.
+   You should see: "Your database is now in sync with your schema"
+   
+   If you get errors:
+   - Check DATABASE_URL is correct
+   - Verify PostgreSQL is running
+   - Test connection: psql $DATABASE_URL
+
+4. Seed the database (creates admin user + sample data):
+   npx prisma db seed
+   
+   This creates:
+   - Admin user: admin@zyloshipping.com / @3088shivA+her
+   - 2 suppliers: AliExpress, CJ Dropshipping
+   - 10 sample products
+   - AI agent states
+   - 3 pricing plans (Starter, Growth, Pro)
+   
+   You should see: "✅ Database seeded successfully!"
+   
+   NOTE: Pricing plans are now stored in the database and can be managed
+   from the admin dashboard at /dashboard/pricing
+
+5. Verify database (optional but recommended):
+   npx prisma studio
+   
+   Opens browser at http://localhost:5555
+   You should see all tables with data:
+   - User table: 1 admin user
+   - Supplier table: 2 suppliers
+   - Product table: 10 products
+   - AgentState table: 8 agents
+   - PricingPlan table: 3 pricing plans
+   
+   Press Ctrl+C to stop Prisma Studio
+
+================================================================================
+STEP 5: FRONTEND CONFIGURATION
+================================================================================
+
+1. Navigate to frontend:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping/frontend
+
+2. Create environment file:
+   cp .env.example .env.local
+
+3. Open .env.local:
+   nano .env.local
+
+4. Fill in variables:
+   NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_your_key_id
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_key
+
+5. Save the file
+
+================================================================================
+STEP 6: START THE APPLICATION (LOCAL)
+================================================================================
+
+METHOD 1: Manual Start (Two Terminals - Recommended for Development)
+---------------------------------------------------------------------
+
+TERMINAL 1 - Start Backend:
+1. Open first terminal window
+
+2. Navigate to backend:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping/backend
+
+3. Start development server:
+   npm run dev
+   
+4. Wait for startup messages (should see):
+   ✓ Prisma Client generated
+   ✓ Server running on http://localhost:4000
+   ✓ Database connected
+   ✓ Redis connected
+   ✓ Algolia connected (if configured)
+   
+5. If you see errors:
+   
+   Error: "Cannot connect to database"
+   - Check PostgreSQL is running: brew services list
+   - Verify DATABASE_URL in .env
+   - Test: psql $DATABASE_URL
+   
+   Error: "Cannot connect to Redis"
+   - Check Redis is running: brew services list
+   - Verify REDIS_URL in .env
+   - Test: redis-cli ping
+   
+   Error: "Port 4000 already in use"
+   - Kill existing process: lsof -ti:4000 | xargs kill -9
+   - Or change PORT in .env
+   
+   Error: "Missing environment variable"
+   - Check .env file exists in backend/
+   - Verify all required variables are set
+   - Compare with .env.example
+
+6. Backend is ready when you see:
+   🚀 Server listening on port 4000
+
+TERMINAL 2 - Start Frontend:
+1. Open second terminal window
+
+2. Navigate to frontend:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping/frontend
+
+3. Start development server:
+   npm run dev
+   
+4. Wait for startup (should see):
+   ▲ Next.js 14.x.x
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.x.x:3000
+   ✓ Ready in 2.5s
+   
+5. If you see errors:
+   
+   Error: "Port 3000 already in use"
+   - Kill existing process: lsof -ti:3000 | xargs kill -9
+   - Or use different port: npm run dev -- -p 3001
+   
+   Error: "Module not found"
+   - Reinstall dependencies: npm install
+   - Clear cache: rm -rf .next && npm run dev
+   
+   Error: "Environment variable not found"
+   - Check .env.local exists in frontend/
+   - Verify NEXT_PUBLIC_BACKEND_URL is set
+
+6. Frontend is ready when you see:
+   ✓ Compiled successfully
+
+KEEP BOTH TERMINALS RUNNING!
+
+METHOD 2: Docker Compose (Easiest - All-in-One)
+------------------------------------------------
+This starts PostgreSQL, Redis, Backend, and Frontend together:
+
+1. Make sure Docker Desktop is running
+
+2. Navigate to project root:
+   cd /Users/shivamkumarsingh/Documents/zyloshipping/zyloshipping
+
+3. Start all services:
+   docker-compose up -d
+   
+   This starts:
+   - PostgreSQL (port 5432)
+   - Redis (port 6379)
+   - Backend (port 4000)
+   - Frontend (port 3000)
+
+4. Check status:
+   docker-compose ps
+   
+   All services should show "Up"
+
+5. View logs:
+   # All services
+   docker-compose logs -f
+   
+   # Specific service
+   docker-compose logs -f backend
+   docker-compose logs -f frontend
+
+6. Stop all services:
+   docker-compose down
+   
+   # Stop and remove volumes (clean slate)
+   docker-compose down -v
+
+7. Restart a service:
+   docker-compose restart backend
+   docker-compose restart frontend
+
+METHOD 3: Background Processes (Advanced)
+------------------------------------------
+Run backend and frontend in background:
+
+1. Start backend in background:
+   cd backend
+   nohup npm run dev > backend.log 2>&1 &
+   echo $! > backend.pid
+
+2. Start frontend in background:
+   cd ../frontend
+   nohup npm run dev > frontend.log 2>&1 &
+   echo $! > frontend.pid
+
+3. View logs:
+   tail -f backend/backend.log
+   tail -f frontend/frontend.log
+
+4. Stop processes:
+   kill $(cat backend/backend.pid)
+   kill $(cat frontend/frontend.pid)
+
+STARTUP CHECKLIST:
+------------------
+Before accessing the application, verify:
+
+□ PostgreSQL is running
+  Test: psql $DATABASE_URL
+  Or: docker ps (if using Docker)
+
+□ Redis is running
+  Test: redis-cli ping
+  Or: docker ps (if using Docker)
+
+□ Backend is running
+  Test: curl http://localhost:4000/health
+  Should return: {"status":"ok",...}
+
+□ Frontend is running
+  Test: curl http://localhost:3000
+  Should return: HTML content
+
+□ No error messages in terminals
+  Check both terminal windows for errors
+
+COMMON STARTUP ISSUES:
+----------------------
+
+Issue: Backend won't start
+Solutions:
+- Check .env file exists and has all required variables
+- Verify PostgreSQL and Redis are running
+- Check port 4000 is not in use: lsof -i:4000
+- Review error messages in terminal
+- Try: rm -rf node_modules && npm install
+
+Issue: Frontend won't start
+Solutions:
+- Check .env.local exists
+- Verify NEXT_PUBLIC_BACKEND_URL is set
+- Check port 3000 is not in use: lsof -i:3000
+- Clear Next.js cache: rm -rf .next
+- Try: rm -rf node_modules && npm install
+
+Issue: "Cannot connect to backend" in browser
+Solutions:
+- Verify backend is running: curl http://localhost:4000/health
+- Check NEXT_PUBLIC_BACKEND_URL in .env.local
+- Check browser console for CORS errors
+- Verify FRONTEND_URL in backend .env
+
+Issue: Database connection errors
+Solutions:
+- Verify PostgreSQL is running
+- Check DATABASE_URL format
+- Test connection: psql $DATABASE_URL
+- Run migrations: npx prisma db push
+
+Issue: Redis connection errors
+Solutions:
+- Verify Redis is running
+- Check REDIS_URL format
+- Test connection: redis-cli ping
+- Restart Redis: brew services restart redis
+
+================================================================================
+STEP 7: VERIFY IT'S WORKING
+================================================================================
+
+1. Open browser: http://localhost:3000
+   - Homepage should load
+   - Should see "ZyloShipping" header
+   - May see "No products available" (normal if no products synced)
+
+2. Test backend health:
+   Open: http://localhost:4000/health
+   Should see:
+   {
+     "status": "ok",
+     "timestamp": "...",
+     "services": {
+       "database": "connected",
+       "redis": "connected",
+       "algolia": "connected"
+     }
+   }
+
+3. Test admin login:
+   - Go to: http://localhost:3000/dashboard
+   - Email: admin@zyloshipping.com
+   - Password: @3088shivA+her
+   - Should see admin dashboard
+
+4. Sync products (in admin dashboard):
+   - Go to Products page
+   - Click "Sync Products" button
+   - Wait for products to sync from suppliers
+   - Products should appear in list
+
+5. Manage pricing plans (NEW FEATURE):
+   - Go to: http://localhost:3000/dashboard/pricing
+   - View all pricing plans (Starter, Growth, Pro)
+   - Click "Edit Plan" to modify any plan
+   - Update prices, features, limits, badges
+   - Changes appear immediately on public pricing page
+   - Public pricing page: http://localhost:3000/pricing
+   
+   NOTE: Pricing is now 100% admin-controlled via database.
+   No more hardcoded pricing in the code!
+
+6. Test customer flow:
+   - Go to: http://localhost:3000
+   - Browse products
+   - Add to cart
+   - Checkout (use test payment)
+
+================================================================================
+STEP 8: PRODUCTION DEPLOYMENT
+================================================================================
+
+BACKEND DEPLOYMENT (Railway - Recommended)
+-------------------------------------------
+
+1. Create Railway account:
+   - Go to https://railway.app
+   - Sign up with GitHub
+
+2. Create new project:
+   - Click "New Project"
+   - Select "Deploy from GitHub repo"
+   - Choose your repository
+   - Select backend folder
+
+3. Add PostgreSQL:
+   - Click "New" > "Database" > "PostgreSQL"
+   - Railway creates database automatically
+   - Copy DATABASE_URL from Variables tab
+
+4. Add Redis:
+   - Click "New" > "Database" > "Redis"
+   - Railway creates Redis automatically
+   - Copy REDIS_URL from Variables tab
+
+5. Set environment variables:
+   - Go to Variables tab
+   - Add all variables from backend/.env
+   - Use production values (not test keys)
+   - Set NODE_ENV=production
+
+6. Deploy:
+   - Railway auto-deploys
+   - Wait for build to complete
+   - Get public URL from Settings
+
+7. Run migrations:
+   - In Railway dashboard, open terminal
+   - Run: npx prisma db push
+   - Run: npx prisma db seed
+
+8. Configure webhooks:
+   Stripe:
+   - Go to Stripe Dashboard > Webhooks
+   - Add endpoint: https://your-railway-url.com/webhooks/stripe
+   - Select events: payment_intent.succeeded, payment_intent.failed
+   - Copy webhook secret to STRIPE_WEBHOOK_SECRET
+   
+   Razorpay:
+   - Go to Razorpay Dashboard > Webhooks
+   - Add webhook: https://your-railway-url.com/webhooks/razorpay
+   - Select events: payment.captured, payment.failed
+   - Copy webhook secret to RAZORPAY_WEBHOOK_SECRET
+
+FRONTEND DEPLOYMENT (Vercel - Recommended)
+-------------------------------------------
+
+1. Create Vercel account:
+   - Go to https://vercel.com
+   - Sign up with GitHub
+
+2. Import project:
+   - Click "New Project"
+   - Import from GitHub
+   - Select your repository
+   - Set root directory: frontend
+
+3. Configure:
+   - Framework: Next.js (auto-detected)
+   - Build command: npm run build (auto-detected)
+   - Output directory: .next (auto-detected)
+
+4. Set environment variables:
+   - NEXT_PUBLIC_BACKEND_URL=https://your-railway-url.com
+   - NEXT_PUBLIC_APP_URL=https://your-vercel-url.vercel.app
+   - NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_live_your_key
+   - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_your_key
+
+5. Deploy:
+   - Click "Deploy"
+   - Wait for build
+   - Get production URL
+
+6. Update backend CORS:
+   - In Railway, add to environment:
+   - FRONTEND_URL=https://your-vercel-url.vercel.app
+
+7. Test production:
+   - Visit your Vercel URL
+   - Test all features
+   - Verify payments work
+
+ALTERNATIVE - Render.com
+------------------------
+Similar to Railway, good alternative:
+1. Create account at https://render.com
+2. Create Web Service for backend
+3. Create Static Site for frontend
+4. Follow similar steps as Railway
+
+================================================================================
+STEP 9: POST-DEPLOYMENT CHECKLIST
+================================================================================
+
+Backend:
+□ Health check returns 200: curl https://your-api.com/health
+□ Database connected (check health response)
+□ Redis connected (check health response)
+□ Admin login works
+□ Webhooks configured in Stripe/Razorpay
+□ CORS allows frontend domain
+
+Frontend:
+□ Homepage loads without errors
+□ Products display (after sync)
+□ Admin dashboard accessible
+□ Login/logout works
+□ Cart functionality works
+□ Checkout flow works
+
+Security:
+□ HTTPS enabled on both domains
+□ JWT secrets are strong (32+ chars)
+□ Admin password changed from default
+□ Database credentials rotated
+□ CORS restricted to production domain only
+□ Rate limiting active
+
+Payments:
+□ Test payment with Razorpay test mode
+□ Test payment with Stripe test mode
+□ Verify webhooks receive events
+□ Switch to live mode when ready
+
+Email:
+□ Test order confirmation email
+□ Test password reset email
+□ Verify sender domain configured
+
+AI Agents:
+□ Groq API key working
+□ Content generation agent active
+□ Product sync working
+□ Check agent logs in admin
+
+================================================================================
+STEP 10: ONGOING MAINTENANCE
+================================================================================
+
+Daily:
+- Check error logs
+- Monitor order processing
+- Verify payment webhooks working
+
+Weekly:
+- Review product inventory
+- Sync new products from suppliers
+- Check AI agent performance
+- Review customer support tickets
+
+Monthly:
+- Database backup verification
+- Security updates (npm audit)
+- Performance optimization
+- Cost analysis
+
+================================================================================
+STEP 11: COMMON ISSUES & SOLUTIONS
+================================================================================
+
+Issue: "Cannot connect to database"
+Solution:
+- Verify DATABASE_URL is correct
+- Check database is running
+- Test connection: psql $DATABASE_URL
+- Verify IP whitelist (if using cloud database)
+
+Issue: "Redis connection failed"
+Solution:
+- Verify REDIS_URL is correct
+- Check Redis is running
+- Test: redis-cli -u $REDIS_URL ping
+
+Issue: "CORS error in browser"
+Solution:
+- Add frontend URL to FRONTEND_URL in backend .env
+- Restart backend server
+- Clear browser cache
+
+Issue: "Payment webhook not working"
+Solution:
+- Verify webhook URL in payment gateway dashboard
+- Check webhook secret matches .env
+- Test webhook with gateway's test tool
+- Check backend logs for webhook errors
+
+Issue: "Products not syncing"
+Solution:
+- Verify supplier API keys in .env
+- Check supplier API status
+- Manually trigger: POST /api/admin/products/sync
+- Check backend logs for errors
+
+Issue: "AI agents not running"
+Solution:
+- Verify GROQ_API_KEY in .env
+- Check Groq API quota (14,400/day free)
+- Add OPENAI_API_KEY as fallback
+- Check agent status in admin dashboard
+
+Issue: "Email not sending"
+Solution:
+- Verify RESEND_API_KEY
+- Check Resend dashboard for errors
+- Verify sender domain configured
+- Check email quota (100/day free tier)
+
+Issue: "Build fails on Vercel"
+Solution:
+- Check build logs for errors
+- Verify all dependencies in package.json
+- Check TypeScript errors: npm run type-check
+- Verify environment variables set
+
+Issue: "Database migration failed"
+Solution:
+- Check DATABASE_URL has direct connection (not pooler)
+- Use DIRECT_URL for migrations
+- Run: npx prisma migrate reset (WARNING: deletes data)
+- Or: npx prisma db push --force-reset
+
+================================================================================
+STEP 12: TESTING CHECKLIST
+================================================================================
+
+Before going live, test:
+
+Customer Flow:
+□ Register new account
+□ Login with email/password
+□ Browse products
+□ Search products
+□ Filter by category
+□ Add to cart
+□ Update cart quantities
+□ Apply coupon code
+□ Checkout
+□ Complete payment (Razorpay test)
+□ Complete payment (Stripe test)
+□ Receive order confirmation email
+□ View order history
+□ Track order
+□ Request refund
+
+Admin Flow:
+□ Login to admin dashboard
+□ View dashboard statistics
+□ Sync products from suppliers
+□ Edit product details
+□ Update product prices
+□ Change product status
+□ View all orders
+□ Update order status
+□ Process refund
+□ View analytics
+□ Check AI agent status
+□ Export data to CSV
+
+API Tests:
+□ Health check: GET /health
+□ Product list: GET /api/products
+□ Product search: GET /api/products?search=test
+□ User registration: POST /api/auth/register
+□ User login: POST /api/auth/login
+□ Create order: POST /api/orders
+□ Admin stats: GET /api/admin/dashboard/stats
+
+Performance:
+□ Homepage loads < 3 seconds
+□ API response time < 200ms
+□ Database queries optimized
+□ Images lazy loaded
+□ Redis caching working
+
+Security:
+□ HTTPS enforced
+□ JWT tokens expire correctly
+□ Password hashing works (bcrypt)
+□ CORS blocks unauthorized origins
+□ Rate limiting prevents abuse
+□ SQL injection prevented
+□ XSS attacks prevented
+
+================================================================================
+STEP 13: GOING LIVE
+================================================================================
+
+When ready for production:
+
+1. Switch payment gateways to live mode:
+   - Razorpay: Use live keys (rzp_live_...)
+   - Stripe: Use live keys (pk_live_..., sk_live_...)
+
+2. Update environment variables:
+   - Set NODE_ENV=production
+   - Use production database
+   - Use production Redis
+   - Update all API keys to production
+
+3. Configure custom domain:
+   Vercel (Frontend):
+   - Go to Settings > Domains
+   - Add your domain (e.g., zyloshipping.com)
+   - Update DNS records as instructed
+   
+   Railway (Backend):
+   - Go to Settings > Domains
+   - Add your domain (e.g., api.zyloshipping.com)
+   - Update DNS records
+
+4. Enable monitoring:
+   - Set up Sentry for error tracking
+   - Configure uptime monitoring (UptimeRobot)
+   - Set up log aggregation
+   - Enable database backups
+
+5. Final security check:
+   - Change admin password
+   - Rotate all secrets
+   - Enable MFA for admin
+   - Review CORS settings
+   - Check rate limits
+
+6. Launch:
+   - Announce to users
+   - Monitor closely for 24 hours
+   - Have rollback plan ready
+   - Keep test environment running
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+Important URLs (Local):
+- Frontend: http://localhost:3000
+- Backend: http://localhost:4000
+- Backend Health: http://localhost:4000/health
+- Prisma Studio: http://localhost:5555 (npx prisma studio)
+- Admin Dashboard: http://localhost:3000/dashboard
+- Admin Pricing: http://localhost:3000/dashboard/pricing
+- Public Pricing: http://localhost:3000/pricing
+
+Admin Credentials:
+- Email: admin@zyloshipping.com
+- Password: @3088shivA+her
+
+Important Commands:
+- Start backend: cd backend && npm run dev
+- Start frontend: cd frontend && npm run dev
+- Start all (Docker): docker-compose up -d
+- Database push: npx prisma db push
+- Database seed: npx prisma db seed
+- Generate Prisma: npx prisma generate
+- View database: npx prisma studio
+- Build backend: npm run build
+- Build frontend: npm run build
+- Type check: npm run type-check
+
+File Locations:
+- Backend env: /backend/.env
+- Frontend env: /frontend/.env.local
+- Database schema: /backend/prisma/schema.prisma
+- API routes: /backend/src/routes/
+- Frontend pages: /frontend/app/
+- Documentation: /COMPLETE_DOCUMENTATION.txt
+
+Support Resources:
+- Full documentation: COMPLETE_DOCUMENTATION.txt
+- Deployment guide: DEPLOYMENT.md
+- Testing checklist: TESTING.md
+- Changes log: CHANGES.md
+
+================================================================================
+CONGRATULATIONS!
+================================================================================
+
+If you've followed all steps, you now have a fully functional ZyloShipping 
+platform running locally and/or deployed to production!
+
+Next steps:
+1. Manage pricing plans from /dashboard/pricing
+2. Customize branding and styling
+3. Add your own products
+4. Configure shipping rates
+5. Set up tax calculations
+6. Add more payment methods
+7. Customize email templates
+8. Add analytics tracking
+9. Implement A/B testing
+10. Add more AI agents
+11. Scale as you grow
+
+Admin Features Available:
+- Dashboard: Real-time stats and metrics
+- Products: Manage products, sync from suppliers
+- Orders: View and manage customer orders
+- Suppliers: Manage supplier integrations
+- Pricing: Control all pricing plans (NEW!)
+- AI Agents: Monitor and configure AI automation
+- Analytics: View detailed analytics (coming soon)
+- Settings: Platform configuration (coming soon)
+
+Good luck with your dropshipping business! 🚀
+
+================================================================================
+Last Updated: March 29, 2026
+Version: 1.0.0
+================================================================================

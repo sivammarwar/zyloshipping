@@ -1,0 +1,1512 @@
+================================================================================
+                    ZYLOSHIPPING - COMPLETE DOCUMENTATION
+                    Full-Stack E-Commerce Dropshipping Platform
+================================================================================
+
+TABLE OF CONTENTS
+=================
+1. PROJECT OVERVIEW
+2. ARCHITECTURE & TECHNOLOGY STACK
+3. FEATURES & FUNCTIONALITY
+4. FILE STRUCTURE & PURPOSE
+5. DATABASE SCHEMA
+6. API ENDPOINTS
+7. AUTHENTICATION & AUTHORIZATION
+8. PAYMENT PROCESSING
+9. AI AGENTS & AUTOMATION
+10. DEPLOYMENT & CONFIGURATION
+11. TROUBLESHOOTING GUIDE
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+ZyloShipping is a production-ready dropshipping e-commerce platform that 
+connects customers with products from multiple suppliers (AliExpress, CJ 
+Dropshipping). The platform handles the entire order lifecycle from browsing 
+to delivery, with AI-powered automation for pricing, content generation, and 
+customer support.
+
+KEY CAPABILITIES:
+- Multi-supplier product catalog with automatic sync
+- Real-time inventory management
+- Multiple payment gateways (Razorpay, Stripe, UPI)
+- AI-powered product curation and pricing
+- Automated order routing to suppliers
+- Real-time shipment tracking via AfterShip
+- Admin dashboard with analytics
+- Customer cart and order management
+- Email notifications for all order events
+
+BUSINESS MODEL:
+1. Products are sourced from suppliers (AliExpress, CJ Dropshipping)
+2. Platform applies markup (default 2.5x) to supplier cost
+3. Customer pays platform price
+4. Platform orders from supplier at cost price
+5. Profit = Customer Price - Supplier Cost - Platform Fees
+
+================================================================================
+2. ARCHITECTURE & TECHNOLOGY STACK
+================================================================================
+
+MONOREPO STRUCTURE:
+- /backend    - Express.js API server (Port 4000)
+- /frontend   - Next.js 14 application (Port 3000)
+- /shared     - Shared TypeScript types (not currently used extensively)
+
+BACKEND STACK:
+- Runtime: Node.js 20+
+- Framework: Express.js
+- Database: PostgreSQL 16+ (via Prisma ORM)
+- Cache/Queue: Redis 7+
+- Authentication: JWT (access + refresh tokens)
+- Validation: Zod schemas
+- Job Queue: BullMQ
+- Search: Algolia
+- Email: Resend
+- Payments: Razorpay, Stripe
+- Tracking: AfterShip
+- AI: Groq (primary), OpenAI (fallback)
+
+FRONTEND STACK:
+- Framework: Next.js 14 (App Router)
+- Language: TypeScript
+- Styling: Tailwind CSS
+- State Management: Zustand
+- Forms: react-hook-form + Zod
+- Icons: Lucide React
+- Animations: Framer Motion
+- Notifications: Sonner
+- Payments: Stripe Elements, Razorpay SDK
+
+INFRASTRUCTURE:
+- Containerization: Docker (multi-stage builds)
+- Frontend Hosting: Vercel
+- Backend Hosting: Railway/Render/DigitalOcean
+- Database: Supabase/Railway PostgreSQL
+- Cache: Upstash Redis or self-hosted
+- CDN: Vercel Edge Network
+
+================================================================================
+3. FEATURES & FUNCTIONALITY
+================================================================================
+
+3.1 CUSTOMER FEATURES
+---------------------
+✓ Product Browsing
+  - Search products by name, SKU, category
+  - Filter by price range, category, free shipping
+  - Sort by price, rating, reviews, newest
+  - Algolia-powered instant search
+  - Product detail pages with images, description, reviews
+
+✓ Shopping Cart
+  - Add/remove/update quantities
+  - Apply coupon codes
+  - Real-time price calculations
+  - Cart persistence (Redis + Database)
+  - Abandoned cart tracking (admin can see)
+
+✓ Checkout & Payment
+  - Multiple payment methods:
+    * Credit/Debit Cards (Razorpay, Stripe)
+    * UPI (Razorpay)
+    * Net Banking
+    * Wallets
+  - Secure payment processing
+  - Order confirmation emails
+  - Invoice generation
+
+✓ Order Management
+  - View order history
+  - Track shipments in real-time
+  - Download invoices
+  - Request refunds
+  - Cancel orders (if not shipped)
+
+✓ Account Management
+  - User registration/login
+  - Password reset via email
+  - Profile management
+  - Order history
+  - Saved addresses
+
+3.2 ADMIN FEATURES
+------------------
+✓ Dashboard
+  - Revenue statistics (today, week, month)
+  - Order counts by status
+  - Average order value
+  - Delivery success rate
+  - Recent orders list
+  - AI agent status monitoring
+  - System alerts
+
+✓ Product Management
+  - List all products with filters
+  - Search by SKU, name, category
+  - Filter by supplier, status, category
+  - Sort by sales, price, stock, name
+  - Edit product details (title, price, description)
+  - Update stock quantities
+  - Change product status (ACTIVE, HIDDEN, LOW, DRAFT)
+  - Bulk actions (activate, hide, delete)
+  - Product analytics (sales, revenue, views)
+  - Sync products from suppliers (AliExpress, CJ)
+
+✓ Order Management
+  - View all orders with filters
+  - Search by order ID, customer
+  - Filter by status, payment gateway
+  - Update order status
+  - Process refunds
+  - View order details and items
+  - Track shipments
+  - Export orders to CSV
+  - Bulk status updates
+
+✓ Supplier Management
+  - View supplier list
+  - Monitor supplier performance
+  - Track pending orders per supplier
+  - View supplier products
+  - Sync inventory from suppliers
+  - API key management
+
+✓ Analytics
+  - Revenue trends over time
+  - Product performance metrics
+  - Customer analytics
+  - Supplier performance
+  - Payment gateway statistics
+  - Conversion rates
+
+✓ AI Agent Management
+  - View agent status (running/idle)
+  - Monitor agent runs and token usage
+  - View agent logs
+  - Enable/disable agents
+  - Configure agent parameters
+
+✓ Pricing Management (NEW)
+  - Create and edit pricing plans
+  - Set monthly and annual pricing
+  - Configure plan features and limits
+  - Set highlighted plans and badges
+  - Control all pricing from database
+  - Changes reflect immediately on public site
+  - No code changes needed for pricing updates
+
+✓ Settings
+  - Store configuration
+  - Payment gateway settings
+  - Email templates
+  - Shipping settings
+  - Tax configuration
+  - API key management
+
+3.3 AI-POWERED FEATURES
+-----------------------
+✓ Content Generation Agent
+  - Generates product descriptions
+  - Creates SEO-friendly titles
+  - Writes marketing copy
+  - Uses Groq (llama-3.3-70b-versatile) or OpenAI
+
+✓ Product Curation Agent
+  - Analyzes supplier products
+  - Recommends products to add
+  - Identifies trending items
+  - Suggests pricing strategies
+
+✓ Dynamic Pricing Agent
+  - Monitors competitor prices
+  - Adjusts margins based on demand
+  - Optimizes for conversion
+  - Maintains profitability
+
+✓ Order Routing Agent
+  - Selects best supplier for each order
+  - Considers stock, price, delivery time
+  - Handles multi-supplier orders
+  - Optimizes shipping costs
+
+✓ Customer Support Agent
+  - Answers common questions
+  - Provides order status updates
+  - Handles refund requests
+  - Escalates complex issues
+
+✓ Refund & Disputes Agent
+  - Processes refund requests
+  - Analyzes dispute validity
+  - Automates approval for simple cases
+  - Flags suspicious patterns
+
+✓ Review Reputation Agent
+  - Monitors product reviews
+  - Identifies fake reviews
+  - Suggests improvements
+  - Tracks sentiment trends
+
+✓ Health Monitor Agent
+  - Checks system health
+  - Monitors API endpoints
+  - Alerts on failures
+  - Tracks performance metrics
+
+================================================================================
+4. FILE STRUCTURE & PURPOSE
+================================================================================
+
+ROOT DIRECTORY
+--------------
+/backend/                   - Express.js API server
+/frontend/                  - Next.js application
+/shared/                    - Shared TypeScript types
+docker-compose.yml          - Local development environment
+.gitignore                  - Git ignore rules
+README.md                   - Project overview and setup
+DEPLOYMENT.md               - Deployment guide
+TESTING.md                  - Testing checklist
+CHANGES.md                  - Production transformation summary
+COMPLETE_DOCUMENTATION.txt  - This file
+
+BACKEND STRUCTURE (/backend/)
+-----------------------------
+
+/prisma/
+  schema.prisma             - Database schema definition
+                              Defines all tables, relations, indexes
+                              
+  seed.ts                   - Database seeding script
+                              Creates admin user (admin@zyloshipping.com / @3088shivA+her)
+                              Creates default suppliers (AliExpress, CJ)
+                              Creates 10 sample products
+                              Initializes AI agent states
+
+/src/
+  index.ts                  - Main application entry point
+                              Initializes Express server
+                              Sets up middleware
+                              Registers routes
+                              Starts server on port 4000
+                              
+  /config/
+    validateEnv.ts          - Environment variable validation
+                              Checks required variables on startup
+                              Exits if critical vars missing
+                              
+  /db/
+    prisma.ts               - Prisma client singleton
+                              Database connection management
+                              
+    redis.ts                - Redis client configuration
+                              Cache and session management
+                              
+  /middleware/
+    auth.middleware.ts      - JWT authentication
+                              Verifies access tokens
+                              Attaches user to request
+                              Handles token refresh
+                              
+    requireAdmin.ts         - Admin role verification
+                              Ensures user has ADMIN role
+                              Blocks non-admin access
+                              
+    requireMFA.ts           - Multi-factor authentication check
+                              Verifies TOTP codes
+                              Required for sensitive admin actions
+                              
+    rateLimiter.middleware.ts - Rate limiting
+                              Prevents brute force attacks
+                              Different limits per endpoint type
+                              Uses Redis for distributed limiting
+                              
+    security.middleware.ts  - Production security
+                              Helmet for HTTP headers
+                              CORS configuration
+                              Input sanitization
+                              Request logging
+                              Error handling
+                              
+  /routes/
+    auth.routes.ts          - Authentication endpoints
+                              POST /api/auth/register - Create account
+                              POST /api/auth/login - Login
+                              POST /api/auth/refresh - Refresh token
+                              POST /api/auth/logout - Logout
+                              GET /api/auth/me - Get current user
+                              POST /api/auth/forgot-password - Request reset
+                              POST /api/auth/reset-password - Reset password
+                              
+    products.routes.ts      - Product endpoints (public + admin)
+                              GET /api/products - List products
+                              GET /api/products/slug/:slug - Get by slug
+                              GET /api/products/:id - Get by ID
+                              POST /api/products - Create (admin)
+                              PUT /api/products/:id - Update (admin)
+                              DELETE /api/products/:id - Delete (admin)
+                              POST /api/products/bulk - Bulk update (admin)
+                              
+    cart.routes.ts          - Shopping cart endpoints
+                              GET /api/cart - Get user cart
+                              POST /api/cart/items - Add item
+                              PATCH /api/cart/items/:productId - Update quantity
+                              DELETE /api/cart/items/:productId - Remove item
+                              DELETE /api/cart - Clear cart
+                              POST /api/cart/validate-coupon - Apply coupon
+                              
+    orders.routes.ts        - Order management
+                              GET /api/orders - List user orders
+                              POST /api/orders - Create order
+                              GET /api/orders/:orderNumber - Get order
+                              GET /api/orders/:orderNumber/track - Track shipment
+                              POST /api/orders/:orderNumber/cancel - Cancel order
+                              POST /api/orders/:orderNumber/refund - Request refund
+                              
+    payment.routes.ts       - Payment processing
+                              POST /api/payments/razorpay/create-order
+                              POST /api/payments/razorpay/verify
+                              POST /api/payments/stripe/create-payment-intent
+                              POST /api/payments/stripe/confirm
+                              POST /api/payments/upi/initiate
+                              POST /api/payments/upi/verify
+                              
+    admin.routes.ts         - Admin dashboard endpoints
+                              POST /api/admin/auth/login - Admin login
+                              GET /api/admin/dashboard/stats - Dashboard stats
+                              GET /api/admin/products - List products
+                              POST /api/admin/products/sync - Sync from suppliers
+                              GET /api/admin/orders - List orders
+                              PUT /api/admin/orders/:id/status - Update status
+                              GET /api/admin/suppliers - List suppliers
+                              GET /api/admin/agents/status - AI agent status
+                              GET /api/admin/analytics/* - Various analytics
+                              
+  /controllers/
+    /admin/
+      authLogin.controller.ts - Admin authentication logic
+      dashboard.controller.ts - Dashboard statistics
+      orders.controller.ts    - Order management logic
+      products.controller.ts  - Product management logic
+      suppliers.controller.ts - Supplier management
+      agents.controller.ts    - AI agent management
+      analytics.controller.ts - Analytics data
+      
+  /services/
+    algolia.service.ts      - Algolia search integration
+                              Index products for search
+                              Update search index on changes
+                              Remove from index on delete
+                              
+    email.service.ts        - Email sending via Resend
+                              Order confirmations
+                              Password resets
+                              Shipping notifications
+                              
+    productSync.service.ts  - Supplier product sync
+                              Fetch from AliExpress API
+                              Fetch from CJ Dropshipping API
+                              Parse and normalize product data
+                              Calculate markup pricing
+                              Update database with new products
+                              
+    payment/
+      razorpay.service.ts   - Razorpay integration
+      stripe.service.ts     - Stripe integration
+      upi.service.ts        - UPI payment handling
+      
+    tracking/
+      aftership.service.ts  - AfterShip tracking integration
+      
+  /agents/
+    llm.ts                  - LLM integration
+                              Groq API (primary, free tier)
+                              OpenAI API (fallback)
+                              Automatic failover
+                              Token usage tracking
+                              
+    contentGeneration.ts    - Content generation agent
+    productCuration.ts      - Product curation agent
+    dynamicPricing.ts       - Dynamic pricing agent
+    orderRouting.ts         - Order routing agent
+    customerSupport.ts      - Customer support agent
+    refundDisputes.ts       - Refund & disputes agent
+    reviewReputation.ts     - Review reputation agent
+    healthMonitor.ts        - Health monitoring agent
+    
+  /jobs/
+    queue.ts                - BullMQ job queue setup
+    productIngestion.job.ts - Product sync job
+    orderAutomation.job.ts  - Order automation job
+    
+  /utils/
+    pagination.ts           - Pagination helpers
+    validation.ts           - Common validation schemas
+    encryption.ts           - AES-256 encryption for API keys
+    
+Dockerfile                  - Production container image
+                              Multi-stage build
+                              Node 20 Alpine base
+                              Non-root user
+                              Health check
+                              
+.env.example                - Environment variable template
+                              All required and optional vars
+                              Documentation for each
+                              
+package.json                - Dependencies and scripts
+                              npm run dev - Development server
+                              npm run build - TypeScript compilation
+                              npm start - Production server
+                              npm run test:api - API tests
+
+FRONTEND STRUCTURE (/frontend/)
+-------------------------------
+
+/app/
+  layout.tsx                - Root layout component
+                              Sets up fonts (Playfair Display, DM Sans)
+                              Global metadata
+                              HTML structure
+                              
+  /(store)/                 - Public storefront routes
+    page.tsx                - Homepage
+                              Hero section
+                              Featured products (fetched from API)
+                              Product ticker
+                              How it works section
+                              Payment methods
+                              Testimonials
+                              Scroll reveal animations
+                              
+    /products/
+      page.tsx              - Product listing page
+                              Real-time product fetching
+                              Search functionality
+                              Category filtering
+                              Price range filter
+                              Free shipping filter
+                              Sort options (price, rating, reviews)
+                              Pagination
+                              Loading and empty states
+                              
+      /[slug]/
+        page.tsx            - Product detail page
+                              Product images gallery
+                              Description
+                              Price and stock info
+                              Add to cart
+                              Reviews
+                              
+    /cart/
+      page.tsx              - Shopping cart
+                              Cart items list
+                              Quantity updates
+                              Remove items
+                              Coupon code input
+                              Price summary
+                              Checkout button
+                              
+    /checkout/
+      page.tsx              - Checkout flow
+                              Shipping address form
+                              Payment method selection
+                              Order summary
+                              Place order
+                              
+  /(admin)/                 - Admin dashboard routes
+    /dashboard/
+      page.tsx              - Admin dashboard home
+                              Revenue stats (fetched from API)
+                              Order counts
+                              Recent orders (real data)
+                              AI agent status (live)
+                              System alerts
+                              Mini charts
+                              
+      /products/
+        page.tsx            - Product management
+                              Product list (real API data)
+                              Search and filters
+                              Bulk actions
+                              Edit products
+                              Stock management
+                              Status updates
+                              Sync from suppliers button
+                              
+      /orders/
+        page.tsx            - Order management
+                              Order list (real API data)
+                              Filter by status, gateway
+                              Search by order ID, customer
+                              Bulk actions
+                              Update status
+                              View details
+                              
+      /suppliers/
+        page.tsx            - Supplier management
+      /analytics/
+        page.tsx            - Analytics dashboard
+      /agents/
+        page.tsx            - AI agent management
+      /settings/
+        page.tsx            - Settings
+        
+/components/
+  /layout/
+    Header.tsx              - Site header with navigation
+    Footer.tsx              - Site footer
+    Sidebar.tsx             - Admin sidebar navigation
+    
+  /store/
+    ProductCard.tsx         - Product card component
+                              Product image
+                              Title, price, rating
+                              Add to cart button
+                              Badge (bestseller, new, etc.)
+                              
+  /admin/
+    StatCard.tsx            - Dashboard stat card
+    OrderTable.tsx          - Order list table
+    ProductTable.tsx        - Product list table
+    
+/lib/
+  api.ts                    - API client library
+                              Centralized API calls
+                              Token management
+                              Error handling
+                              Type-safe interfaces
+                              
+                              Functions:
+                              - api.products.list() - Get products
+                              - api.products.getBySlug() - Get product
+                              - api.orders.list() - Get orders
+                              - api.cart.get() - Get cart
+                              - api.admin.dashboard.stats() - Dashboard stats
+                              - api.admin.products.list() - Admin products
+                              - api.admin.orders.list() - Admin orders
+                              - api.auth.login() - Login
+                              - api.auth.register() - Register
+                              
+  utils.ts                  - Utility functions
+                              cn() - Class name merging
+                              formatPrice() - Price formatting
+                              formatDate() - Date formatting
+                              
+/styles/
+  globals.css               - Global styles
+                              Tailwind directives
+                              Custom CSS variables
+                              Animations
+                              
+tailwind.config.ts          - Tailwind configuration
+                              Custom colors (red, ink, off-white)
+                              Custom fonts (serif, sans)
+                              Custom animations (float, ticker, fade-up)
+                              Custom spacing
+                              
+next.config.js              - Next.js configuration
+                              Image optimization
+                              Remote image patterns
+                              Environment variables
+                              
+vercel.json                 - Vercel deployment config
+                              Security headers
+                              API proxy rules
+                              Environment variables
+                              
+Dockerfile                  - Frontend container (optional)
+package.json                - Dependencies and scripts
+
+================================================================================
+5. DATABASE SCHEMA
+================================================================================
+
+TABLES & RELATIONSHIPS:
+
+User
+----
+- id: String (UUID)
+- email: String (unique)
+- passwordHash: String
+- name: String?
+- phone: String?
+- role: UserRole (CUSTOMER, ADMIN)
+- totpEnabled: Boolean
+- totpSecret: String?
+- createdAt: DateTime
+- updatedAt: DateTime
+
+Relations:
+- orders: Order[]
+- cart: Cart?
+- adminLogs: AdminLog[]
+
+Product
+-------
+- id: String (UUID)
+- sku: String (unique)
+- slug: String (unique)
+- title: String
+- description: String?
+- category: String
+- price: Float
+- supplierCost: Float
+- stockQuantity: Int
+- status: ProductStatus (ACTIVE, HIDDEN, LOW, DRAFT, ARCHIVED)
+- supplierId: String
+- imagesJson: Json (array of image URLs)
+- rating: Float
+- totalSales: Int
+- createdAt: DateTime
+- updatedAt: DateTime
+
+Relations:
+- supplier: Supplier
+- orderItems: OrderItem[]
+- metricAudits: ProductMetricAudit[]
+
+Supplier
+--------
+- id: String (UUID)
+- name: String (unique)
+- apiKey: String? (encrypted)
+- apiSecret: String? (encrypted)
+- lastSyncAt: DateTime?
+- activeProducts: Int
+- pendingOrders: Int
+- totalOrders: Int
+- avgDeliveryDays: Int
+- rating: Float
+- responseTimeMs: Int
+- uptimePercent: Float
+- createdAt: DateTime
+- updatedAt: DateTime
+
+Relations:
+- products: Product[]
+- orders: Order[]
+
+Order
+-----
+- id: String (UUID)
+- orderNumber: String (unique, e.g., ZY-28431)
+- userId: String
+- supplierId: String?
+- totalAmount: Float
+- status: OrderStatus (PENDING, PROCESSING, SHIPPED, IN_TRANSIT, DELIVERED, CANCELLED, REFUNDED)
+- paymentMethod: String
+- paymentGateway: String
+- paymentId: String?
+- trackingNumber: String?
+- shippingAddress: Json
+- createdAt: DateTime
+- updatedAt: DateTime
+
+Relations:
+- user: User
+- supplier: Supplier?
+- items: OrderItem[]
+
+OrderItem
+---------
+- id: String (UUID)
+- orderId: String
+- productId: String
+- quantity: Int
+- unitPrice: Float
+- createdAt: DateTime
+
+Relations:
+- order: Order
+- product: Product
+
+Cart
+----
+- id: String (UUID)
+- userId: String (unique)
+- items: Json (array of cart items)
+- couponCode: String?
+- discount: Float
+- createdAt: DateTime
+- updatedAt: DateTime
+
+Relations:
+- user: User
+
+AgentState
+----------
+- id: String (UUID)
+- name: String (unique)
+- status: AgentStatus (IDLE, RUNNING, ERROR)
+- lastRunAt: DateTime?
+- totalRuns: Int
+- totalTokens: Int
+- config: Json
+- createdAt: DateTime
+- updatedAt: DateTime
+
+AiLog
+-----
+- id: String (UUID)
+- agentName: String
+- inputJson: Json
+- outputJson: Json
+- tokensUsed: Int
+- latencyMs: Int
+- createdAt: DateTime
+
+AdminLog
+--------
+- id: String (UUID)
+- userId: String
+- action: String
+- resource: String
+- resourceId: String?
+- meta: Json?
+- createdAt: DateTime
+
+Relations:
+- user: User
+
+ProductMetricAudit
+------------------
+- id: String (UUID)
+- productId: String
+- kind: String (price, stock, etc.)
+- value: Float
+- recordedAt: DateTime
+
+Relations:
+- product: Product
+
+INDEXES:
+- User: email (unique)
+- Product: sku (unique), slug (unique), category, status, supplierId
+- Order: orderNumber (unique), userId, status, createdAt
+- OrderItem: orderId, productId
+- Cart: userId (unique)
+- AgentState: name (unique)
+- AiLog: agentName, createdAt
+- AdminLog: userId, createdAt
+
+================================================================================
+6. API ENDPOINTS
+================================================================================
+
+BASE URL: http://localhost:4000 (development)
+          https://api.zyloshipping.com (production)
+
+AUTHENTICATION ENDPOINTS
+------------------------
+POST   /api/auth/register
+       Body: { email, password, name?, phone? }
+       Returns: { user, accessToken, refreshToken }
+       
+POST   /api/auth/login
+       Body: { email, password }
+       Returns: { user, accessToken, refreshToken }
+       Sets: HTTP-only cookies with tokens
+       
+POST   /api/auth/refresh
+       Headers: Cookie with refreshToken
+       Returns: { accessToken }
+       
+POST   /api/auth/logout
+       Clears: Authentication cookies
+       Returns: { message: "Logged out" }
+       
+GET    /api/auth/me
+       Headers: Authorization: Bearer {accessToken}
+       Returns: { user }
+       
+POST   /api/auth/forgot-password
+       Body: { email }
+       Sends: Password reset email
+       
+POST   /api/auth/reset-password
+       Body: { token, password }
+       Returns: { message: "Password reset" }
+
+PRODUCT ENDPOINTS (PUBLIC)
+---------------------------
+GET    /api/products
+       Query: page, limit, search, category, sortBy, sortDir
+       Returns: { products[], pagination }
+       
+GET    /api/products/slug/:slug
+       Returns: { product }
+       
+GET    /api/products/:id
+       Returns: { product }
+
+CART ENDPOINTS
+--------------
+GET    /api/cart
+       Headers: Authorization required
+       Returns: { cart, items[], subtotal, total }
+       
+POST   /api/cart/items
+       Headers: Authorization required
+       Body: { productId, quantity }
+       Returns: { cart }
+       
+PATCH  /api/cart/items/:productId
+       Headers: Authorization required
+       Body: { quantity }
+       Returns: { cart }
+       
+DELETE /api/cart/items/:productId
+       Headers: Authorization required
+       Returns: { cart }
+       
+DELETE /api/cart
+       Headers: Authorization required
+       Returns: { message: "Cart cleared" }
+       
+POST   /api/cart/validate-coupon
+       Headers: Authorization required
+       Body: { code }
+       Returns: { valid, discount }
+
+ORDER ENDPOINTS
+---------------
+GET    /api/orders
+       Headers: Authorization required
+       Query: page, limit, status
+       Returns: { orders[], pagination }
+       
+POST   /api/orders
+       Headers: Authorization required
+       Body: { items[], shippingAddress, paymentMethod }
+       Returns: { order, paymentIntent }
+       
+GET    /api/orders/:orderNumber
+       Headers: Authorization required
+       Returns: { order, items[] }
+       
+GET    /api/orders/:orderNumber/track
+       Headers: Authorization required
+       Returns: { tracking, events[] }
+       
+POST   /api/orders/:orderNumber/cancel
+       Headers: Authorization required
+       Returns: { order }
+       
+POST   /api/orders/:orderNumber/refund
+       Headers: Authorization required
+       Body: { reason }
+       Returns: { refund }
+
+PAYMENT ENDPOINTS
+-----------------
+POST   /api/payments/razorpay/create-order
+       Headers: Authorization required
+       Body: { amount, currency }
+       Returns: { orderId, amount, currency }
+       
+POST   /api/payments/razorpay/verify
+       Headers: Authorization required
+       Body: { razorpay_order_id, razorpay_payment_id, razorpay_signature }
+       Returns: { verified: true }
+       
+POST   /api/payments/stripe/create-payment-intent
+       Headers: Authorization required
+       Body: { amount, currency }
+       Returns: { clientSecret, paymentIntentId }
+       
+POST   /api/payments/stripe/confirm
+       Headers: Authorization required
+       Body: { paymentIntentId }
+       Returns: { status }
+       
+POST   /api/payments/upi/initiate
+       Headers: Authorization required
+       Body: { amount, vpa }
+       Returns: { transactionId, qrCode }
+       
+POST   /api/payments/upi/verify
+       Headers: Authorization required
+       Body: { transactionId }
+       Returns: { status }
+
+ADMIN ENDPOINTS
+---------------
+POST   /api/admin/auth/login
+       Body: { email, password }
+       Returns: { user, accessToken }
+       Requires: ADMIN role
+       
+GET    /api/admin/dashboard/stats
+       Headers: Authorization required (admin)
+       Returns: { revenueToday, ordersToday, avgOrderValue, deliverySuccessRate }
+       
+GET    /api/admin/products
+       Headers: Authorization required (admin)
+       Query: page, limit, search, category, supplier, status, sortBy, sortDir
+       Returns: { products[], pagination }
+       
+POST   /api/admin/products/sync
+       Headers: Authorization required (admin)
+       Triggers: Product sync job from suppliers
+       Returns: { jobId, message }
+       
+PUT    /api/admin/products/:id
+       Headers: Authorization required (admin)
+       Body: { title?, description?, price?, status? }
+       Returns: { product }
+       
+DELETE /api/admin/products/:id
+       Headers: Authorization required (admin)
+       Returns: { product } (status set to ARCHIVED)
+       
+GET    /api/admin/orders
+       Headers: Authorization required (admin)
+       Query: page, limit, search, status, gateway
+       Returns: { orders[], pagination }
+       
+PUT    /api/admin/orders/:id/status
+       Headers: Authorization required (admin)
+       Body: { status }
+       Returns: { order }
+       
+POST   /api/admin/orders/:id/refund
+       Headers: Authorization required (admin)
+       Body: { amount, reason }
+       Returns: { refund }
+       
+GET    /api/admin/suppliers
+       Headers: Authorization required (admin)
+       Returns: { suppliers[] }
+       
+GET    /api/admin/agents/status
+       Headers: Authorization required (admin)
+       Returns: { agents[] }
+       
+GET    /api/admin/analytics/revenue
+       Headers: Authorization required (admin)
+       Query: startDate, endDate
+       Returns: { data[], total }
+       
+GET    /api/admin/pricing
+       Headers: None (public endpoint)
+       Returns: { plans[] }
+       Note: Public endpoint for fetching pricing plans
+       
+GET    /api/admin/pricing/:id
+       Headers: Authorization required (admin)
+       Returns: { plan }
+       
+POST   /api/admin/pricing
+       Headers: Authorization required (admin)
+       Body: { planId, name, tagline, monthlyPrice, annualPrice, isHighlight, badge?, ctaText, features[], limits[], displayOrder }
+       Returns: { plan }
+       Note: Prices in paise (₹1,999 = 199900)
+       
+PUT    /api/admin/pricing/:id
+       Headers: Authorization required (admin)
+       Body: Partial plan object
+       Returns: { plan }
+       
+DELETE /api/admin/pricing/:id
+       Headers: Authorization required (admin)
+       Returns: { success: true }
+
+WEBHOOK ENDPOINTS
+-----------------
+POST   /webhooks/stripe
+       Headers: stripe-signature
+       Body: Stripe webhook event
+       Handles: payment_intent.succeeded, payment_intent.failed
+       
+POST   /webhooks/razorpay
+       Headers: x-razorpay-signature
+       Body: Razorpay webhook event
+       Handles: payment.captured, payment.failed
+       
+POST   /webhooks/aftership
+       Headers: aftership-signature
+       Body: AfterShip tracking event
+       Handles: tracking updates
+
+HEALTH CHECK
+------------
+GET    /health
+       Returns: { 
+         status: "ok",
+         timestamp,
+         version,
+         services: {
+           database: "connected" | "error",
+           redis: "connected" | "error",
+           algolia: "connected" | "error"
+         }
+       }
+
+================================================================================
+7. AUTHENTICATION & AUTHORIZATION
+================================================================================
+
+AUTHENTICATION FLOW:
+1. User registers or logs in
+2. Server generates JWT access token (15min expiry)
+3. Server generates JWT refresh token (7 days expiry)
+4. Tokens stored in HTTP-only cookies
+5. Frontend includes token in Authorization header
+6. Server validates token on protected routes
+7. Token refresh when access token expires
+
+JWT PAYLOAD:
+{
+  userId: string,
+  email: string,
+  role: "CUSTOMER" | "ADMIN",
+  iat: number,
+  exp: number
+}
+
+AUTHORIZATION LEVELS:
+- Public: No authentication required
+- Authenticated: Valid JWT token required
+- Admin: JWT token + ADMIN role required
+- Admin + MFA: JWT token + ADMIN role + TOTP verification
+
+MIDDLEWARE CHAIN:
+1. authMiddleware - Verifies JWT token
+2. requireAdmin - Checks ADMIN role
+3. requireMFA - Verifies TOTP code (for sensitive operations)
+
+PASSWORD SECURITY:
+- Hashed with bcrypt (12 rounds)
+- Minimum 8 characters
+- Must contain uppercase, lowercase, number, special char
+- Password reset via email token (1 hour expiry)
+
+MULTI-FACTOR AUTHENTICATION (MFA):
+- TOTP (Time-based One-Time Password)
+- QR code generation for authenticator apps
+- Backup codes for recovery
+- Required for admin sensitive operations
+
+================================================================================
+8. PAYMENT PROCESSING
+================================================================================
+
+SUPPORTED PAYMENT METHODS:
+1. Razorpay (India)
+   - Credit/Debit Cards
+   - UPI
+   - Net Banking
+   - Wallets (Paytm, PhonePe, etc.)
+   
+2. Stripe (International)
+   - Credit/Debit Cards
+   - Apple Pay
+   - Google Pay
+   
+3. UPI Direct
+   - UPI VPA
+   - QR Code
+
+PAYMENT FLOW:
+1. Customer adds items to cart
+2. Proceeds to checkout
+3. Selects payment method
+4. Frontend creates payment intent via API
+5. Payment gateway processes payment
+6. Webhook confirms payment
+7. Order status updated to PROCESSING
+8. Order sent to supplier
+9. Confirmation email sent
+
+RAZORPAY INTEGRATION:
+- Create order: POST /api/payments/razorpay/create-order
+- Frontend displays Razorpay checkout
+- Customer completes payment
+- Razorpay sends payment_id, order_id, signature
+- Backend verifies signature
+- Order confirmed
+
+STRIPE INTEGRATION:
+- Create payment intent: POST /api/payments/stripe/create-payment-intent
+- Frontend uses Stripe Elements
+- Customer enters card details
+- Stripe processes payment
+- Webhook confirms payment
+- Order confirmed
+
+UPI FLOW:
+- Initiate UPI: POST /api/payments/upi/initiate
+- Generate QR code or collect VPA
+- Customer approves on UPI app
+- Poll for status: POST /api/payments/upi/verify
+- Order confirmed on success
+
+REFUND PROCESSING:
+- Customer requests refund
+- Admin reviews request
+- Refund initiated via payment gateway API
+- Refund status tracked
+- Customer notified via email
+
+================================================================================
+9. AI AGENTS & AUTOMATION
+================================================================================
+
+AI PROVIDER:
+- Primary: Groq (llama-3.3-70b-versatile)
+  * Free tier: 14,400 requests/day
+  * Fast inference (< 1s)
+  * Cost-effective for production
+  
+- Fallback: OpenAI (GPT-4o)
+  * Used when Groq fails
+  * Higher quality for complex tasks
+  * Pay-per-use pricing
+
+AGENT ARCHITECTURE:
+- Each agent is a separate module
+- Agents run as BullMQ jobs
+- State stored in AgentState table
+- Logs stored in AiLog table
+- Can be enabled/disabled via admin
+
+CONTENT GENERATION AGENT:
+Purpose: Generate product descriptions and marketing copy
+Trigger: New product added or manual trigger
+Process:
+  1. Fetch product details
+  2. Call LLM with product info
+  3. Generate SEO-friendly description
+  4. Update product in database
+  5. Index in Algolia
+Input: Product title, category, features
+Output: Description, meta tags, keywords
+
+PRODUCT CURATION AGENT:
+Purpose: Analyze and recommend products from suppliers
+Trigger: Daily cron job or manual trigger
+Process:
+  1. Fetch products from supplier APIs
+  2. Analyze trends, demand, competition
+  3. Score products based on criteria
+  4. Recommend top products to admin
+  5. Auto-add high-scoring products
+Input: Supplier product catalog
+Output: Product recommendations with scores
+
+DYNAMIC PRICING AGENT:
+Purpose: Optimize product pricing for maximum profit
+Trigger: Hourly cron job
+Process:
+  1. Fetch competitor prices
+  2. Analyze demand and conversion rates
+  3. Calculate optimal price
+  4. Update product prices
+  5. Log price changes
+Input: Product data, sales history, competitor prices
+Output: Updated prices
+
+ORDER ROUTING AGENT:
+Purpose: Select best supplier for each order
+Trigger: New order created
+Process:
+  1. Check product availability
+  2. Compare supplier prices
+  3. Estimate delivery times
+  4. Calculate total cost
+  5. Select optimal supplier
+  6. Route order to supplier
+Input: Order items, customer location
+Output: Supplier assignment, estimated delivery
+
+CUSTOMER SUPPORT AGENT:
+Purpose: Answer customer questions automatically
+Trigger: Customer message received
+Process:
+  1. Analyze customer query
+  2. Check knowledge base
+  3. Generate response
+  4. Send to customer
+  5. Escalate if needed
+Input: Customer message, order history
+Output: Response or escalation
+
+REFUND & DISPUTES AGENT:
+Purpose: Automate refund processing
+Trigger: Refund request submitted
+Process:
+  1. Analyze refund request
+  2. Check order status
+  3. Verify eligibility
+  4. Auto-approve simple cases
+  5. Flag complex cases for review
+Input: Refund request, order data
+Output: Approval/rejection decision
+
+REVIEW REPUTATION AGENT:
+Purpose: Monitor and manage product reviews
+Trigger: New review submitted
+Process:
+  1. Analyze review sentiment
+  2. Detect fake reviews
+  3. Flag inappropriate content
+  4. Calculate product rating
+  5. Update product score
+Input: Review text, user history
+Output: Review status, product rating
+
+HEALTH MONITOR AGENT:
+Purpose: Monitor system health and performance
+Trigger: Every 5 minutes
+Process:
+  1. Check database connection
+  2. Check Redis connection
+  3. Check external APIs
+  4. Monitor response times
+  5. Alert on failures
+Input: System metrics
+Output: Health status, alerts
+
+AGENT CONFIGURATION:
+- Stored in AgentState.config (JSON)
+- Can be updated via admin panel
+- Example config:
+  {
+    enabled: true,
+    schedule: "0 */1 * * *", // Hourly
+    maxTokens: 1000,
+    temperature: 0.7,
+    model: "llama-3.3-70b-versatile"
+  }
+
+================================================================================
+10. DEPLOYMENT & CONFIGURATION
+================================================================================
+
+ENVIRONMENT VARIABLES (Backend):
+
+REQUIRED:
+- DATABASE_URL - PostgreSQL connection string
+- REDIS_URL - Redis connection string
+- JWT_SECRET - JWT signing secret (32+ chars)
+- JWT_REFRESH_SECRET - Refresh token secret (32+ chars)
+- GROQ_API_KEY - Groq API key (free tier)
+- FRONTEND_URL - Frontend URL for CORS
+
+PAYMENT GATEWAYS:
+- RAZORPAY_KEY_ID - Razorpay key ID
+- RAZORPAY_KEY_SECRET - Razorpay secret
+- STRIPE_SECRET_KEY - Stripe secret key
+- STRIPE_WEBHOOK_SECRET - Stripe webhook secret
+
+SEARCH & EMAIL:
+- ALGOLIA_APP_ID - Algolia app ID
+- ALGOLIA_ADMIN_KEY - Algolia admin key
+- ALGOLIA_SEARCH_KEY - Algolia search-only key
+- RESEND_API_KEY - Resend email API key
+
+OPTIONAL:
+- OPENAI_API_KEY - OpenAI fallback
+- AFTERSHIP_API_KEY - Shipment tracking
+- ALIEXPRESS_API_KEY - Product sourcing
+- CJ_DROPSHIPPING_API_KEY - Product sourcing
+- ENCRYPTION_KEY - For encrypting API keys (32 chars)
+- SENTRY_DSN - Error tracking
+
+ENVIRONMENT VARIABLES (Frontend):
+
+REQUIRED:
+- NEXT_PUBLIC_BACKEND_URL - Backend API URL
+- NEXT_PUBLIC_APP_URL - Frontend URL
+
+PAYMENT GATEWAYS:
+- NEXT_PUBLIC_RAZORPAY_KEY_ID - Razorpay public key
+- NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY - Stripe public key
+
+DEPLOYMENT STEPS:
+
+1. BACKEND (Railway/Render):
+   a. Create PostgreSQL database
+   b. Create Redis instance
+   c. Set all environment variables
+   d. Deploy from GitHub or Docker
+   e. Run migrations: npx prisma db push
+   f. Run seed: npx prisma db seed
+   g. Verify health: GET /health
+
+2. FRONTEND (Vercel):
+   a. Connect GitHub repository
+   b. Set root directory to /frontend
+   c. Set environment variables
+   d. Deploy
+   e. Verify homepage loads
+
+3. POST-DEPLOYMENT:
+   a. Test admin login
+   b. Sync products from suppliers
+   c. Test payment flow
+   d. Configure webhooks in payment gateways
+   e. Set up monitoring
+
+DOCKER DEPLOYMENT:
+
+Local Development:
+```bash
+docker-compose up -d
+```
+
+Production:
+```bash
+# Backend
+cd backend
+docker build -t zyloshipping-backend .
+docker run -p 4000:4000 --env-file .env zyloshipping-backend
+
+# Frontend
+cd frontend
+docker build -t zyloshipping-frontend .
+docker run -p 3000:3000 --env-file .env.local zyloshipping-frontend
+```
+
+SCALING CONSIDERATIONS:
+- Backend: Stateless, can scale horizontally
+- Database: Use connection pooling (PgBouncer)
+- Redis: Use Redis Cluster for HA
+- Frontend: Vercel handles auto-scaling
+- Job Queue: Separate workers for heavy jobs
+
+MONITORING:
+- Health endpoint: /health
+- Error tracking: Sentry
+- Logs: Application logs + database logs
+- Metrics: Response times, error rates
+- Alerts: Email/SMS on critical failures
+
+BACKUP STRATEGY:
+- Database: Daily automated backups
+- Redis: RDB snapshots every 6 hours
+- Code: Git repository
+- Environment: Encrypted secrets backup
+
+================================================================================
+11. TROUBLESHOOTING GUIDE
+================================================================================
+
+COMMON ISSUES & SOLUTIONS:
+
+1. "Database connection failed"
+   Cause: Invalid DATABASE_URL or database not accessible
+   Solution:
+   - Verify DATABASE_URL format
+   - Check database is running
+   - Verify network access
+   - Test connection: psql $DATABASE_URL
+
+2. "Redis connection failed"
+   Cause: Invalid REDIS_URL or Redis not running
+   Solution:
+   - Verify REDIS_URL format
+   - Check Redis is running
+   - Test connection: redis-cli ping
+
+3. "CORS error in browser"
+   Cause: Frontend URL not in CORS whitelist
+   Solution:
+   - Add frontend URL to FRONTEND_URL env var
+   - Check backend CORS configuration
+   - Verify credentials: 'include' in fetch
+
+4. "JWT token expired"
+   Cause: Access token expired (15min)
+   Solution:
+   - Frontend should auto-refresh token
+   - Check refresh token endpoint
+   - Verify token expiry settings
+
+5. "Payment verification failed"
+   Cause: Invalid webhook signature
+   Solution:
+   - Verify webhook secret matches gateway
+   - Check webhook endpoint URL
+   - Test with gateway's test mode
+
+6. "Products not syncing"
+   Cause: Invalid supplier API keys
+   Solution:
+   - Verify API keys in .env
+   - Check supplier API status
+   - Review sync job logs
+   - Manually trigger: POST /api/admin/products/sync
+
+7. "AI agents not running"
+   Cause: Missing GROQ_API_KEY or OpenAI key
+   Solution:
+   - Set GROQ_API_KEY in .env
+   - Verify API key is valid
+   - Check agent status in admin
+   - Review agent logs
+
+8. "Email not sending"
+   Cause: Invalid RESEND_API_KEY
+   Solution:
+   - Verify Resend API key
+   - Check email templates
+   - Review Resend dashboard for errors
+
+9. "Search not working"
+   Cause: Algolia not configured
+   Solution:
+   - Verify Algolia credentials
+   - Check products are indexed
+   - Manually reindex products
+
+10. "High response times"
+    Cause: Database queries not optimized
+    Solution:
+    - Check database indexes
+    - Enable Redis caching
+    - Use connection pooling
+    - Analyze slow queries
+
+DEBUGGING TIPS:
+- Check backend logs: docker logs zyloshipping-backend
+- Check frontend logs: Browser console
+- Test API: curl or Postman
+- Check database: psql or pgAdmin
+- Check Redis: redis-cli
+- Monitor jobs: BullMQ dashboard
+
+PERFORMANCE OPTIMIZATION:
+- Enable Redis caching for products
+- Use database indexes
+- Optimize images (WebP, lazy loading)
+- Enable CDN for static assets
+- Use connection pooling
+- Implement rate limiting
+
+SECURITY CHECKLIST:
+- HTTPS enabled
+- JWT secrets strong (32+ chars)
+- Database credentials rotated
+- Admin password changed from default
+- CORS restricted to production domains
+- Rate limiting active
+- Input validation enabled
+- Error messages sanitized
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+
+This documentation covers all aspects of the ZyloShipping platform. For 
+additional support or questions, refer to:
+- README.md - Quick start guide
+- DEPLOYMENT.md - Deployment instructions
+- TESTING.md - Testing checklist
+- CHANGES.md - Recent changes
+
+Last Updated: March 29, 2026
+Version: 1.0.0 (Production Ready)

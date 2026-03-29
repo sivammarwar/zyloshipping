@@ -14,8 +14,8 @@ Monorepo for a dropshipping storefront (Next.js 14) and Express API (Prisma + Po
 
 - Node **20+**
 - PostgreSQL (e.g. Supabase)
-- Upstash Redis (REST + optional `REDIS_URL` for BullMQ)
-- Accounts: OpenAI, Razorpay, Stripe, Algolia, Resend, CJ Dropshipping
+- Redis (for caching, sessions, job queue)
+- Accounts: Groq (primary LLM, free tier), OpenAI (optional fallback), Razorpay, Stripe, Algolia, Resend, CJ Dropshipping, AliExpress
 
 ## Environment variables
 
@@ -65,7 +65,7 @@ Copy `backend/.env.example` to `backend/.env` and fill every **required** value.
    npx prisma db seed
    ```
 
-   Default admin: `admin@zyloshipping.com` / `Admin@123` (change immediately in production).
+   Default admin: `admin@zyloshipping.com` / `@3088shivA+her`
 
 5. **Run in development**
 
