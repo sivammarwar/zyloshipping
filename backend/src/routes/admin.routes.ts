@@ -247,4 +247,32 @@ router.patch('/agents/:id', async (req: AuthRequest, res: Response) => {
   res.json({ agent });
 });
 
+// ── Low Stock Alerts ──────────────────────────────────────────
+import { getActiveLowStockAlerts, dismissLowStockAlert } from '../services/inventory/alerts.service';
+
+router.get('/inventory/alerts', async (req: AuthRequest, res: Response) => {
+  try {
+    const alerts = await getActiveLowStockAlerts();
+    res.json({ alerts });
+  } catch (error) {
+    console.error('[admin] Error fetching low stock alerts:', error);
+    res.status(500).json({ error: 'Failed to fetch alerts' });
+  }
+});
+
+router.post('/inventory/alerts/:productId/dismiss', async (req: AuthRequest, res: Response) => {
+  try {
+    await dismissLowStockAlert(req.params.productId);
+    await logAdminAction(req, { 
+      action: 'inventory.dismiss_alert', 
+      resource: 'product', 
+      resourceId: req.params.productId 
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[admin] Error dismissing alert:', error);
+    res.status(500).json({ error: 'Failed to dismiss alert' });
+  }
+});
+
 export default router;

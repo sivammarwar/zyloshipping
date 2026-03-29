@@ -1,19 +1,29 @@
+import { ensureValidToken, clearAuth } from './tokenManager';
+
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:4000';
 
 interface FetchOptions extends RequestInit {
   token?: string;
+  skipAuth?: boolean;
+  retryOn401?: boolean;
 }
 
 async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
-  const { token, ...fetchOptions } = options;
+  const { token, skipAuth = false, retryOn401 = true, ...fetchOptions } = options;
   
-  const headers: HeadersInit = {
+  // Auto-refresh token if needed (unless skipAuth is true)
+  let authToken = token;
+  if (!skipAuth && !token) {
+    authToken = await ensureValidToken() || undefined;
+  }
+  
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...fetchOptions.headers,
+    ...(fetchOptions.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -21,6 +31,43 @@ async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promis
     headers,
     credentials: 'include',
   });
+
+  // Handle 401 Unauthorized - try to refresh token once
+  if (response.status === 401 && retryOn401 && !skipAuth) {
+    console.log('[API] 401 received, attempting token refresh...');
+    
+    const newToken = await ensureValidToken();
+    
+    if (newToken) {
+      // Retry request with new token
+      headers['Authorization'] = `Bearer ${newToken}`;
+      
+      const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
+        ...fetchOptions,
+        headers,
+        credentials: 'include',
+      });
+      
+      if (retryResponse.ok) {
+        return retryResponse.json();
+      }
+    }
+    
+    // If refresh failed or retry failed, clear auth and redirect
+    clearAuth();
+    
+    // Only redirect to login if we're in the browser and not on a public page
+    if (typeof window !== 'undefined') {
+      const publicPages = ['/', '/products', '/login', '/register'];
+      const currentPath = window.location.pathname;
+      
+      if (!publicPages.some(page => currentPath.startsWith(page))) {
+        window.location.href = '/login?redirect=' + encodeURIComponent(currentPath);
+      }
+    }
+    
+    throw new Error('Authentication required');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));

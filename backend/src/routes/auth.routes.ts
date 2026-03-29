@@ -7,9 +7,14 @@ import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { authLimiter } from '../middleware/rateLimiter.middleware';
-import { sendPasswordResetEmail } from '../services/email.service';
+import { sendPasswordResetEmail } from '../services/email/passwordReset';
 import { signTokenPair, setAuthCookies } from '../services/auth/token.service';
 import { redis, KEYS } from '../utils/redis';
+import {
+  isAccountLocked,
+  incrementLoginAttempts,
+  clearLoginAttempts,
+} from '../services/auth/loginAttempts.service';
 
 const router = Router();
 
@@ -68,6 +73,14 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
   }
 
   const { email, password } = parsed.data;
+
+  // Check if account is locked due to failed attempts
+  if (await isAccountLocked(email)) {
+    return res.status(429).json({ 
+      error: 'Too many failed login attempts. Please try again in 15 minutes.' 
+    });
+  }
+
   const user = await prisma.user.findUnique({
     where: { email },
     select: {
@@ -82,12 +95,17 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
   });
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    // Increment failed login attempts
+    await incrementLoginAttempts(email);
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
   if (!user.isActive) {
     return res.status(403).json({ error: 'Account is disabled' });
   }
+
+  // Clear failed login attempts on successful login
+  await clearLoginAttempts(email);
 
   let mfaVerified = !user.totpEnabled;
   if (user.totpEnabled && redis) {
@@ -137,7 +155,11 @@ router.post('/forgot-password', authLimiter, async (req: Request, res: Response)
     });
     const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const resetUrl = `${base}/forgot-password?token=${raw}`;
-    await sendPasswordResetEmail(user.email, resetUrl);
+    await sendPasswordResetEmail({
+      email: user.email,
+      resetLink: resetUrl,
+      ipAddress: req.ip
+    });
   }
 
   res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' });

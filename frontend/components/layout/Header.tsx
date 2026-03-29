@@ -6,7 +6,6 @@ import Link from 'next/link';
 const NAV_LINKS = [
   { label: 'Products', href: '/products' },
   { label: 'Track Order', href: '/track' },
-  
   { label: 'About', href: '/about' },
 ];
 
@@ -150,6 +149,29 @@ export default function Header() {
           </Link>
         </li>
 
+        {/* Chat / Support icon */}
+        <li>
+          <Link
+            href="/support"
+            aria-label="Support chat"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              color: 'var(--ink-muted)',
+              textDecoration: 'none',
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--red)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-muted)')}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3l3 3 3-3h5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
+              <line x1="5" y1="7" x2="13" y2="7" />
+              <line x1="5" y1="10" x2="9" y2="10" />
+            </svg>
+          </Link>
+        </li>
+
         {/* CTA */}
         <li>
           <Link
@@ -261,6 +283,31 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
+
+          {/* Support link in mobile menu */}
+          <Link
+            href="/support"
+            onClick={() => setMenuOpen(false)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              fontSize: '1rem',
+              fontWeight: 400,
+              color: 'var(--ink-muted)',
+              textDecoration: 'none',
+              padding: '0.5rem 0',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3l3 3 3-3h5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
+              <line x1="5" y1="7" x2="13" y2="7" />
+              <line x1="5" y1="10" x2="9" y2="10" />
+            </svg>
+            Support
+          </Link>
+
           <Link
             href="/register"
             onClick={() => setMenuOpen(false)}

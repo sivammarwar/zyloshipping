@@ -1053,10 +1053,20 @@ AUTHENTICATION FLOW:
 1. User registers or logs in
 2. Server generates JWT access token (15min expiry)
 3. Server generates JWT refresh token (7 days expiry)
-4. Tokens stored in HTTP-only cookies
+4. Tokens stored in localStorage (frontend) and HTTP-only cookies
 5. Frontend includes token in Authorization header
 6. Server validates token on protected routes
 7. Token refresh when access token expires
+
+ADMIN LOGIN:
+- URL: /login (same page for both admin and customer)
+- Admin credentials: admin@zyloshipping.com / @3088shivA+her
+- Uses real API: POST /api/admin/auth/login
+- JWT token stored in localStorage
+- Token persists across browser sessions
+- Logout button in dashboard clears token and redirects to /login
+- Dashboard auto-redirects to /login if no valid token found
+- All dummy stats removed from login page (clean UI)
 
 JWT PAYLOAD:
 {

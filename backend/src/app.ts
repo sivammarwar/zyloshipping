@@ -9,6 +9,12 @@ import morgan from 'morgan';
 import { apiLimiter } from './middleware/rateLimiter.middleware';
 import { redisApiLimiter } from './middleware/redisRateLimiter.middleware';
 import { requestIdMiddleware, RequestWithId } from './middleware/requestId.middleware';
+import { 
+  rateLimitGeneral, 
+  rateLimitAuth, 
+  rateLimitPayment, 
+  rateLimitAdmin 
+} from './middleware/rateLimit.middleware';
 import { getPublicHealthPayload } from './services/health/publicHealth.service';
 import authRoutes from './routes/auth.routes';
 import productRoutes from './routes/products.routes';
@@ -103,19 +109,19 @@ export function createApp(): Express {
     }
   });
 
-  const limiter = process.env.UPSTASH_REDIS_REST_URL ? redisApiLimiter : apiLimiter;
-  app.use('/api', limiter);
-
-  app.use('/api/auth', authRoutes);
-  app.use('/api/products', productRoutes);
-  app.use('/api/orders', orderRoutes);
-  app.use('/api/cart', cartRoutes);
-  app.use('/api/payments', paymentRoutes);
-  app.use('/api/suppliers', supplierRoutes);
-  app.use('/api/webhooks', webhookRoutes);
-  app.use('/api/admin', adminRoutes);
-  app.use('/api/support', supportRoutes);
-  app.use('/api/reviews', reviewRoutes);
+  // Apply specific rate limiters to different route groups
+  app.use('/api/auth', rateLimitAuth, authRoutes);
+  app.use('/api/payments', rateLimitPayment, paymentRoutes);
+  app.use('/api/admin', rateLimitAdmin, adminRoutes);
+  app.use('/api/webhooks', webhookRoutes); // No rate limit on webhooks
+  
+  // General rate limiter for all other routes
+  app.use('/api/products', rateLimitGeneral, productRoutes);
+  app.use('/api/orders', rateLimitGeneral, orderRoutes);
+  app.use('/api/cart', rateLimitGeneral, cartRoutes);
+  app.use('/api/suppliers', rateLimitGeneral, supplierRoutes);
+  app.use('/api/support', rateLimitGeneral, supportRoutes);
+  app.use('/api/reviews', rateLimitGeneral, reviewRoutes);
 
   app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 

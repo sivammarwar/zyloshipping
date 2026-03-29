@@ -8,6 +8,7 @@ import { runOrderCompletionJob } from './orderCompletion.job';
 import { runHealthMonitorJob } from './healthMonitor.job';
 import { runPricingUpdateJob } from './pricingUpdate.job';
 import { runTrackingPollerJob } from './trackingPoller.job';
+import { runAbandonedCartJob } from './abandonedCart.job';
 
 const url = process.env.REDIS_URL;
 const connection = url
@@ -38,7 +39,7 @@ export function getOrderAutomationQueue(): Queue | null {
 
 async function processAutomationJob(job: {
   name: string;
-  data: { orderId?: string; supplierId?: string };
+  data: { orderId?: string; supplierId?: string; userId?: string; cartId?: string };
 }): Promise<void> {
   switch (job.name) {
     case 'orderSubmission':
@@ -64,6 +65,11 @@ async function processAutomationJob(job: {
       break;
     case 'trackingPoller':
       await runTrackingPollerJob();
+      break;
+    case 'abandonedCart':
+      if (job.data.userId && job.data.cartId) {
+        await runAbandonedCartJob(job.data.userId, job.data.cartId);
+      }
       break;
     default:
       console.warn('[bullmq] unknown job', job.name);

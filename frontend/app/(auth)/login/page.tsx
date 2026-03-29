@@ -2,19 +2,21 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading]   = useState(false);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [error, setError]       = useState('');
 
   async function handleLogin() {
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     setError('');
     setLoading(true);
-    
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/auth/login`, {
         method: 'POST',
@@ -30,10 +32,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Store token in localStorage
       if (data.accessToken) {
         localStorage.setItem('token', data.accessToken);
-        // Redirect to dashboard
         window.location.href = '/dashboard';
       } else {
         setError('Login failed. Please try again.');
@@ -46,9 +46,35 @@ export default function LoginPage() {
     }
   }
 
+  async function handleGoogleLogin() {
+    setSocialLoading('google');
+    setError('');
+    try {
+      await signIn('google', { callbackUrl: '/dashboard' });
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError('Google login failed. Please try again.');
+      setSocialLoading(null);
+    }
+  }
+
+  async function handleAppleLogin() {
+    setSocialLoading('apple');
+    setError('');
+    try {
+      await signIn('apple', { callbackUrl: '/dashboard' });
+    } catch (err) {
+      console.error('Apple login error:', err);
+      setError('Apple login failed. Please try again.');
+      setSocialLoading(null);
+    }
+  }
+
   const SOCIAL = [
     {
       label: 'Continue with Google',
+      key: 'google' as const,
+      onClick: handleGoogleLogin,
       icon: (
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.616Z" fill="#4285F4"/>
@@ -60,6 +86,8 @@ export default function LoginPage() {
     },
     {
       label: 'Continue with Apple',
+      key: 'apple' as const,
+      onClick: handleAppleLogin,
       icon: (
         <svg width="16" height="18" viewBox="0 0 16 18" fill="currentColor">
           <path d="M13.173 9.497c-.02-2.15 1.754-3.19 1.836-3.245-1.001-1.462-2.557-1.663-3.11-1.685-1.322-.134-2.588.781-3.258.781-.67 0-1.7-.763-2.794-.743C4.29 4.629 2.853 5.577 2.07 7.02.48 9.949 1.656 14.3 3.199 16.68c.764 1.162 1.672 2.46 2.864 2.414 1.148-.046 1.58-.737 2.967-.737 1.387 0 1.775.737 2.99.715 1.237-.02 2.016-1.18 2.773-2.347a10.84 10.84 0 0 0 1.267-2.72c-.03-.014-2.42-.926-2.887-3.508ZM11.013 3.13C11.638 2.367 12.06 1.327 11.94.27c-.898.037-1.995.6-2.642 1.345-.576.665-1.085 1.733-.946 2.751.998.077 2.02-.51 2.662-1.236Z"/>
@@ -73,17 +101,14 @@ export default function LoginPage() {
 
       {/* ── Left: Decorative panel ── */}
       <div style={{ background: 'var(--ink)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '3rem', position: 'relative', overflow: 'hidden' }} className="auth-left-panel">
-        {/* Decorative circles */}
         <div style={{ position: 'absolute', top: -120, right: -120, width: 400, height: 400, borderRadius: '50%', background: 'var(--red)', opacity: 0.08 }} />
         <div style={{ position: 'absolute', bottom: -80, left: -80, width: 280, height: 280, borderRadius: '50%', border: '50px solid rgba(255,255,255,0.03)' }} />
         <div style={{ position: 'absolute', top: '40%', left: '30%', width: 180, height: 180, borderRadius: '50%', border: '30px solid rgba(196,30,58,0.1)' }} />
 
-        {/* Logo */}
         <Link href="/" style={{ fontFamily: 'var(--serif)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--white)', textDecoration: 'none', letterSpacing: '-0.02em', position: 'relative', zIndex: 1 }}>
           Zylo<span style={{ color: 'var(--red)' }}>.</span>
         </Link>
 
-        {/* Central content */}
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ fontSize: '0.7rem', fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--red)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ display: 'inline-block', width: 16, height: 1, background: 'var(--red)' }} />
@@ -93,45 +118,18 @@ export default function LoginPage() {
             Ship anywhere.<br />
             <span style={{ color: 'var(--red)' }}>Sell everywhere.</span>
           </h2>
-          <p style={{ fontSize: '0.92rem', color: 'rgba(255,255,255,0.45)', fontWeight: 300, lineHeight: 1.7, maxWidth: 340, marginBottom: '2.5rem' }}>
-            Join 12,000+ sellers using ZyloShipping's AI-powered platform to source and ship products worldwide.
+          <p style={{ fontSize: '0.92rem', color: 'rgba(255,255,255,0.45)', fontWeight: 300, lineHeight: 1.7, maxWidth: 340 }}>
+            AI-powered dropshipping platform to source and ship products worldwide.
           </p>
-
-          {/* Stats */}
-          <div style={{ display: 'flex', gap: '2rem' }}>
-            {[
-              { num: '47K+', label: 'Monthly orders' },
-              { num: '98%',  label: 'Delivery rate' },
-              { num: '135+', label: 'Currencies' },
-            ].map((s) => (
-              <div key={s.label}>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.5rem', fontWeight: 900, color: 'var(--white)', lineHeight: 1 }}>{s.num}</div>
-                <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', marginTop: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* Testimonial */}
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, padding: '1.25rem 1.5rem', position: 'relative', zIndex: 1 }}>
-          <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.55)', fontWeight: 300, lineHeight: 1.65, marginBottom: '0.75rem', fontStyle: 'italic' }}>
-            "I went from $0 to $12K/month in 3 months. The AI pricing tool alone paid for everything."
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontSize: '0.72rem', fontWeight: 700, color: 'white' }}>RK</div>
-            <div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 500, color: 'rgba(255,255,255,0.7)' }}>Ryan K.</div>
-              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)' }}>Electronics seller · New York</div>
-            </div>
-          </div>
-        </div>
+        <div style={{ position: 'relative', zIndex: 1 }} />
       </div>
 
       {/* ── Right: Login form ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 4vw', background: 'var(--off-white)' }}>
         <div style={{ width: '100%', maxWidth: 400 }}>
 
-          {/* Header */}
           <div style={{ marginBottom: '2rem' }}>
             <h1 style={{ fontFamily: 'var(--serif)', fontSize: '2rem', fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.025em', marginBottom: '0.35rem' }}>
               Welcome back
@@ -149,12 +147,23 @@ export default function LoginPage() {
             {SOCIAL.map((s) => (
               <button
                 key={s.label}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.65rem', padding: '0.75rem', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 2, fontSize: '0.85rem', color: 'var(--ink)', cursor: 'pointer', fontFamily: 'var(--sans)', fontWeight: 400, transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ink)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
+                onClick={s.onClick}
+                disabled={socialLoading !== null}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.65rem',
+                  padding: '0.75rem', background: 'var(--white)', border: '1.5px solid var(--border)',
+                  borderRadius: 2, fontSize: '0.85rem', color: 'var(--ink)',
+                  cursor: socialLoading !== null ? 'default' : 'pointer',
+                  fontFamily: 'var(--sans)', fontWeight: 400, transition: 'border-color 0.2s, box-shadow 0.2s',
+                  opacity: socialLoading !== null && socialLoading !== s.key ? 0.5 : 1,
+                }}
+                onMouseEnter={e => { if (!socialLoading) { e.currentTarget.style.borderColor = 'var(--ink)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; } }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
               >
-                {s.icon}
-                {s.label}
+                {socialLoading === s.key ? (
+                  <span style={{ width: 16, height: 16, border: '2px solid rgba(0,0,0,0.15)', borderTopColor: 'var(--ink)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                ) : s.icon}
+                {socialLoading === s.key ? 'Connecting…' : s.label}
               </button>
             ))}
           </div>

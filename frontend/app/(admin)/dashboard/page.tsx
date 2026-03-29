@@ -74,6 +74,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
+    if (!storedToken) {
+      window.location.href = '/login';
+      return;
+    }
     setToken(storedToken);
   }, []);
 

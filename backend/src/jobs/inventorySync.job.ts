@@ -3,6 +3,7 @@ import { prisma } from '../db/prisma';
 import { getAliExpressAdapter } from '../services/supplier/aliexpress.adapter';
 import { getCjAdapter } from '../services/supplier/cj.adapter';
 import { isAliExpressConfigured } from '../utils/supplierConfig';
+import { checkAndCreateLowStockAlerts } from '../services/inventory/alerts.service';
 
 export async function runInventorySyncJob(supplierId?: string): Promise<void> {
   const ae = getAliExpressAdapter();
@@ -31,4 +32,7 @@ export async function runInventorySyncJob(supplierId?: string): Promise<void> {
       },
     });
   }
+
+  // Check and create low stock alerts after sync
+  await checkAndCreateLowStockAlerts();
 }

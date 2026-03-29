@@ -1,0 +1,983 @@
+================================================================================
+ZYLOSHIPPING - DETAILED IMPLEMENTATION GUIDES (PART 2)
+================================================================================
+Version: 1.3.1
+Date: March 29, 2026
+
+Continuation of implementation guides for remaining frontend features.
+
+================================================================================
+GUIDE 2: REVIEW SYSTEM (CONTINUED)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+STEP 7: Create Review List Component (1 hour)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/reviews/ReviewsList.tsx
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { StarRating } from './StarRating';
+import { Review, ReviewsResponse } from '@/types/review';
+import { formatDistanceToNow } from 'date-fns';
+
+interface ReviewsListProps {
+  productId: string;
+  refreshTrigger?: number;
+}
+
+export function ReviewsList({ productId, refreshTrigger }: ReviewsListProps) {
+  const [data, setData] = useState<ReviewsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    loadReviews();
+  }, [productId, page, refreshTrigger]);
+
+  const loadReviews = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/reviews/${productId}?page=${page}&limit=10`
+      );
+      
+      if (response.ok) {
+        const reviewsData = await response.json();
+        setData(reviewsData);
+      }
+    } catch (error) {
+      console.error('Failed to load reviews:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading && !data) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto"></div>
+      </div>
+    );
+  }
+
+  if (!data || data.reviews.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">No reviews yet. Be the first to review!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Rating Summary */}
+      <div className="bg-gray-50 rounded-lg p-6 mb-6">
+        <div className="flex items-center gap-6">
+          {/* Average Rating */}
+          <div className="text-center">
+            <div className="text-4xl font-bold text-gray-900">
+              {data.avgRating.toFixed(1)}
+            </div>
+            <StarRating rating={Math.round(data.avgRating)} readonly size="md" />
+            <p className="text-sm text-gray-600 mt-1">
+              {data.totalReviews} {data.totalReviews === 1 ? 'review' : 'reviews'}
+            </p>
+          </div>
+
+          {/* Rating Breakdown */}
+          <div className="flex-1">
+            {[5, 4, 3, 2, 1].map((rating) => {
+              const count = data.ratingBreakdown[rating.toString()] || 0;
+              const percentage = data.totalReviews > 0 
+                ? (count / data.totalReviews) * 100 
+                : 0;
+
+              return (
+                <div key={rating} className="flex items-center gap-2 mb-1">
+                  <span className="text-sm text-gray-600 w-12">
+                    {rating} ★
+                  </span>
+                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-yellow-400"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-gray-600 w-12 text-right">
+                    {count}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Reviews List */}
+      <div className="space-y-6">
+        {data.reviews.map((review) => (
+          <div key={review.id} className="border-b border-gray-200 pb-6 last:border-0">
+            {/* Review Header */}
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-gray-900">
+                    {review.userName}
+                  </span>
+                  {review.isVerifiedPurchase && (
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">
+                      ✓ Verified Purchase
+                    </span>
+                  )}
+                </div>
+                <StarRating rating={review.rating} readonly size="sm" />
+              </div>
+              <span className="text-sm text-gray-500">
+                {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
+              </span>
+            </div>
+
+            {/* Review Title */}
+            {review.title && (
+              <h4 className="font-semibold text-gray-900 mb-2">
+                {review.title}
+              </h4>
+            )}
+
+            {/* Review Text */}
+            {review.text && (
+              <p className="text-gray-700 mb-3 whitespace-pre-wrap">
+                {review.text}
+              </p>
+            )}
+
+            {/* AI Reply */}
+            {review.aiReply && (
+              <div className="mt-3 pl-4 border-l-2 border-gray-300 bg-gray-50 p-3 rounded">
+                <p className="text-sm text-gray-600 mb-1 font-medium">
+                  💬 ZyloShipping Response:
+                </p>
+                <p className="text-sm text-gray-700">
+                  {review.aiReply}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {data.pagination.totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-6">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <span className="px-4 py-2 text-gray-700">
+            Page {page} of {data.pagination.totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(data.pagination.totalPages, p + 1))}
+            disabled={page === data.pagination.totalPages}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 8: Add Reviews to Product Page (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/app/(store)/products/[slug]/page.tsx
+
+// Add these imports at the top
+import { ReviewForm } from '@/components/reviews/ReviewForm';
+import { ReviewsList } from '@/components/reviews/ReviewsList';
+import { getUserFromToken } from '@/lib/tokenManager';
+import { useState } from 'react';
+
+// Inside the component, add state for refresh trigger
+const [reviewRefreshTrigger, setReviewRefreshTrigger] = useState(0);
+const user = getUserFromToken();
+
+// Add this section after product details and before footer
+{/* Reviews Section */}
+<section className="mt-12">
+  <h2 className="text-2xl font-bold text-gray-900 mb-6">
+    Customer Reviews
+  </h2>
+
+  {/* Review Form - Only show if user is logged in */}
+  {user && (
+    <div className="mb-8">
+      <ReviewForm
+        productId={product.id}
+        onSuccess={() => {
+          setReviewRefreshTrigger(prev => prev + 1);
+          alert('Review submitted successfully!');
+        }}
+      />
+    </div>
+  )}
+
+  {/* Reviews List */}
+  <ReviewsList 
+    productId={product.id} 
+    refreshTrigger={reviewRefreshTrigger}
+  />
+</section>
+
+────────────────────────────────────────────────────────────────────────────
+COMPLETION CHECKLIST - REVIEW SYSTEM
+────────────────────────────────────────────────────────────────────────────
+
+Backend:
+✅ Created reviews.routes.ts with POST and GET endpoints
+✅ Enhanced reviewReputation.agent.ts with auto-reply
+✅ Registered routes in app.ts
+✅ Verified purchase check implemented
+✅ Duplicate review prevention
+✅ Product rating update logic
+
+Frontend:
+✅ Created review types
+✅ Created StarRating component
+✅ Created ReviewForm component
+✅ Created ReviewsList component
+✅ Added reviews section to product page
+✅ Implemented pagination
+✅ Added verified purchase badges
+✅ Displayed AI replies
+
+Testing:
+□ Submit a review (should require login and purchase)
+□ Try to submit duplicate review (should fail)
+□ View reviews list with pagination
+□ Check rating summary and breakdown
+□ Verify AI reply appears after submission
+□ Test on mobile devices
+
+Estimated Time: 6-8 hours
+Actual Time: _______
+
+================================================================================
+GUIDE 3: MOBILE RESPONSIVENESS
+================================================================================
+Estimated Time: 3-4 hours
+Priority: HIGH
+
+OVERVIEW:
+Improve mobile experience across all pages with responsive navigation,
+touch-optimized components, and mobile-specific layouts.
+
+────────────────────────────────────────────────────────────────────────────
+STEP 1: Create Mobile Navigation Menu (1.5 hours)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/layout/MobileNav.tsx
+
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { getUserFromToken } from '@/lib/tokenManager';
+
+export function MobileNav() {
+  const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+  const user = getUserFromToken();
+
+  const navItems = [
+    { href: '/', label: 'Home', icon: '🏠' },
+    { href: '/products', label: 'Products', icon: '🛍️' },
+    { href: '/cart', label: 'Cart', icon: '🛒' },
+    { href: '/orders', label: 'Orders', icon: '📦', authRequired: true },
+    { href: '/support', label: 'Support', icon: '💬', authRequired: true },
+  ];
+
+  const filteredItems = navItems.filter(
+    item => !item.authRequired || user
+  );
+
+  return (
+    <>
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-white rounded-lg shadow-lg"
+        aria-label="Toggle menu"
+      >
+        <div className="w-6 h-6 flex flex-col justify-center gap-1.5">
+          <span className={`block h-0.5 bg-gray-900 transition-transform ${
+            isOpen ? 'rotate-45 translate-y-2' : ''
+          }`} />
+          <span className={`block h-0.5 bg-gray-900 transition-opacity ${
+            isOpen ? 'opacity-0' : ''
+          }`} />
+          <span className={`block h-0.5 bg-gray-900 transition-transform ${
+            isOpen ? '-rotate-45 -translate-y-2' : ''
+          }`} />
+        </div>
+      </button>
+
+      {/* Mobile Menu Overlay */}
+      {isOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Mobile Menu */}
+      <div className={`lg:hidden fixed top-0 right-0 bottom-0 w-64 bg-white z-40 transform transition-transform ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        <div className="p-6 pt-20">
+          {/* User Info */}
+          {user && (
+            <div className="mb-6 pb-6 border-b border-gray-200">
+              <p className="text-sm text-gray-600">Signed in as</p>
+              <p className="font-medium text-gray-900">{user.email}</p>
+            </div>
+          )}
+
+          {/* Navigation Items */}
+          <nav className="space-y-2">
+            {filteredItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  pathname === item.href
+                    ? 'bg-red-50 text-red-600'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span className="text-xl">{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          {/* Auth Actions */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            {user ? (
+              <>
+                {user.role === 'ADMIN' && (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setIsOpen(false)}
+                    className="block px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg mb-2"
+                  >
+                    ⚙️ Admin Dashboard
+                  </Link>
+                )}
+                <button
+                  onClick={() => {
+                    localStorage.clear();
+                    window.location.href = '/login';
+                  }}
+                  className="w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg text-left"
+                >
+                  🚪 Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg mb-2"
+                >
+                  🔑 Sign In
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-4 py-3 bg-red-500 text-white hover:bg-red-600 rounded-lg text-center"
+                >
+                  Create Account
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 2: Create Mobile Bottom Navigation (1 hour)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/layout/BottomNav.tsx
+
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { getUserFromToken } from '@/lib/tokenManager';
+
+export function BottomNav() {
+  const pathname = usePathname();
+  const user = getUserFromToken();
+
+  const navItems = [
+    { href: '/', label: 'Home', icon: '🏠' },
+    { href: '/products', label: 'Shop', icon: '🛍️' },
+    { href: '/cart', label: 'Cart', icon: '🛒' },
+    { href: user ? '/orders' : '/login', label: user ? 'Orders' : 'Login', icon: user ? '📦' : '🔑' },
+  ];
+
+  return (
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30">
+      <div className="flex justify-around items-center h-16">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+                isActive ? 'text-red-600' : 'text-gray-600'
+              }`}
+            >
+              <span className="text-2xl mb-1">{item.icon}</span>
+              <span className="text-xs font-medium">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 3: Add Mobile Navigation to Layout (15 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/app/layout.tsx or frontend/app/(store)/layout.tsx
+
+import { MobileNav } from '@/components/layout/MobileNav';
+import { BottomNav } from '@/components/layout/BottomNav';
+
+// Add to the layout
+<body>
+  <MobileNav />
+  {children}
+  <BottomNav />
+  {/* Add padding bottom on mobile to account for bottom nav */}
+  <div className="lg:hidden h-16" />
+</body>
+
+────────────────────────────────────────────────────────────────────────────
+STEP 4: Mobile-Optimize Product Cards (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+Update product card component with mobile-specific styles:
+
+// In your ProductCard component
+<div className="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+  {/* Image - responsive aspect ratio */}
+  <div className="aspect-square sm:aspect-[4/3] overflow-hidden">
+    <img
+      src={product.image}
+      alt={product.title}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+    />
+  </div>
+
+  {/* Content - adjust padding for mobile */}
+  <div className="p-3 sm:p-4">
+    {/* Title - limit lines on mobile */}
+    <h3 className="text-sm sm:text-base font-medium text-gray-900 line-clamp-2 mb-2">
+      {product.title}
+    </h3>
+
+    {/* Price - larger on mobile for touch */}
+    <p className="text-lg sm:text-xl font-bold text-red-600 mb-3">
+      ₹{product.price.toLocaleString('en-IN')}
+    </p>
+
+    {/* Button - full width on mobile */}
+    <button className="w-full sm:w-auto px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium">
+      Add to Cart
+    </button>
+  </div>
+</div>
+
+────────────────────────────────────────────────────────────────────────────
+STEP 5: Mobile-Optimize Forms (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+Update form inputs with mobile-friendly sizes:
+
+// Standard input component
+<input
+  type="text"
+  className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+/>
+
+// Buttons
+<button className="w-full sm:w-auto px-6 py-3 sm:py-2 text-base sm:text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium">
+  Submit
+</button>
+
+// Select dropdowns
+<select className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-gray-300 rounded-lg">
+  <option>Option 1</option>
+</select>
+
+────────────────────────────────────────────────────────────────────────────
+COMPLETION CHECKLIST - MOBILE RESPONSIVENESS
+────────────────────────────────────────────────────────────────────────────
+
+✅ Created MobileNav component with hamburger menu
+✅ Created BottomNav component with tab bar
+✅ Added mobile navigation to layout
+✅ Mobile-optimized product cards
+✅ Mobile-optimized form inputs
+✅ Touch-friendly button sizes (min 44x44px)
+✅ Responsive typography
+✅ Responsive spacing and padding
+
+Testing:
+□ Test on iPhone (Safari)
+□ Test on Android (Chrome)
+□ Test on tablet (iPad)
+□ Test landscape orientation
+□ Test touch interactions
+□ Test bottom navigation
+□ Test hamburger menu
+□ Verify no horizontal scroll
+
+Estimated Time: 3-4 hours
+Actual Time: _______
+
+================================================================================
+GUIDE 4: SEARCH & FILTER UI
+================================================================================
+Estimated Time: 2-3 hours
+Priority: MEDIUM
+
+OVERVIEW:
+Add advanced search and filtering capabilities to product listing pages.
+
+────────────────────────────────────────────────────────────────────────────
+STEP 1: Create Filter Sidebar Component (1 hour)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/products/FilterSidebar.tsx
+
+'use client';
+
+import { useState } from 'react';
+
+interface FilterSidebarProps {
+  onFilterChange: (filters: ProductFilters) => void;
+  categories: string[];
+}
+
+interface ProductFilters {
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minRating?: number;
+  inStock?: boolean;
+  sortBy?: string;
+}
+
+export function FilterSidebar({ onFilterChange, categories }: FilterSidebarProps) {
+  const [filters, setFilters] = useState<ProductFilters>({});
+  const [isOpen, setIsOpen] = useState(false);
+
+  const updateFilter = (key: keyof ProductFilters, value: any) => {
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
+  };
+
+  const clearFilters = () => {
+    setFilters({});
+    onFilterChange({});
+  };
+
+  return (
+    <>
+      {/* Mobile Filter Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="lg:hidden w-full px-4 py-3 bg-white border border-gray-300 rounded-lg mb-4 flex items-center justify-between"
+      >
+        <span className="font-medium">Filters</span>
+        <span>{isOpen ? '▲' : '▼'}</span>
+      </button>
+
+      {/* Filter Sidebar */}
+      <div className={`bg-white rounded-lg border border-gray-200 p-6 ${
+        isOpen ? 'block' : 'hidden lg:block'
+      }`}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+          <button
+            onClick={clearFilters}
+            className="text-sm text-red-600 hover:text-red-700"
+          >
+            Clear All
+          </button>
+        </div>
+
+        {/* Category Filter */}
+        <div className="mb-6">
+          <h4 className="font-medium text-gray-900 mb-3">Category</h4>
+          <div className="space-y-2">
+            {categories.map((category) => (
+              <label key={category} className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="category"
+                  checked={filters.category === category}
+                  onChange={() => updateFilter('category', category)}
+                  className="w-4 h-4 text-red-600 focus:ring-red-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">{category}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Price Range */}
+        <div className="mb-6">
+          <h4 className="font-medium text-gray-900 mb-3">Price Range</h4>
+          <div className="space-y-3">
+            <input
+              type="number"
+              placeholder="Min price"
+              value={filters.minPrice || ''}
+              onChange={(e) => updateFilter('minPrice', e.target.value ? Number(e.target.value) : undefined)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+            <input
+              type="number"
+              placeholder="Max price"
+              value={filters.maxPrice || ''}
+              onChange={(e) => updateFilter('maxPrice', e.target.value ? Number(e.target.value) : undefined)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Rating Filter */}
+        <div className="mb-6">
+          <h4 className="font-medium text-gray-900 mb-3">Minimum Rating</h4>
+          <div className="space-y-2">
+            {[4, 3, 2, 1].map((rating) => (
+              <label key={rating} className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="rating"
+                  checked={filters.minRating === rating}
+                  onChange={() => updateFilter('minRating', rating)}
+                  className="w-4 h-4 text-red-600 focus:ring-red-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                  {rating}+ ★
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* In Stock Only */}
+        <div className="mb-6">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filters.inStock || false}
+              onChange={(e) => updateFilter('inStock', e.target.checked || undefined)}
+              className="w-4 h-4 text-red-600 focus:ring-red-500 rounded"
+            />
+            <span className="ml-2 text-sm text-gray-700">In Stock Only</span>
+          </label>
+        </div>
+
+        {/* Sort By */}
+        <div>
+          <h4 className="font-medium text-gray-900 mb-3">Sort By</h4>
+          <select
+            value={filters.sortBy || ''}
+            onChange={(e) => updateFilter('sortBy', e.target.value || undefined)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            <option value="">Default</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="rating_desc">Highest Rated</option>
+            <option value="newest">Newest First</option>
+          </select>
+        </div>
+      </div>
+    </>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 2: Create Search Bar Component (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/products/SearchBar.tsx
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useDebounce } from '@/lib/hooks/useDebounce';
+
+interface SearchBarProps {
+  onSearch: (query: string) => void;
+  placeholder?: string;
+}
+
+export function SearchBar({ onSearch, placeholder = 'Search products...' }: SearchBarProps) {
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 300);
+
+  useEffect(() => {
+    onSearch(debouncedQuery);
+  }, [debouncedQuery, onSearch]);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+      />
+      <svg
+        className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        />
+      </svg>
+      {query && (
+        <button
+          onClick={() => setQuery('')}
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 3: Create useDebounce Hook (10 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/lib/hooks/useDebounce.ts
+
+import { useState, useEffect } from 'react';
+
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 4: Update Products Page (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/app/(store)/products/page.tsx
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { FilterSidebar } from '@/components/products/FilterSidebar';
+import { SearchBar } from '@/components/products/SearchBar';
+import { ProductCard } from '@/components/products/ProductCard';
+
+export default function ProductsPage() {
+  const [products, setProducts] = useState([]);
+  const [filters, setFilters] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadProducts();
+  }, [filters, searchQuery]);
+
+  const loadProducts = async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('search', searchQuery);
+      if (filters.category) params.set('category', filters.category);
+      if (filters.minPrice) params.set('minPrice', filters.minPrice);
+      if (filters.maxPrice) params.set('maxPrice', filters.maxPrice);
+      if (filters.minRating) params.set('minRating', filters.minRating);
+      if (filters.inStock) params.set('inStock', 'true');
+      if (filters.sortBy) {
+        const [sortBy, sortDir] = filters.sortBy.split('_');
+        params.set('sortBy', sortBy);
+        params.set('sortDir', sortDir || 'asc');
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/products?${params}`
+      );
+      const data = await response.json();
+      setProducts(data.products || []);
+    } catch (error) {
+      console.error('Failed to load products:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">
+          All Products
+        </h1>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <SearchBar onSearch={setSearchQuery} />
+        </div>
+
+        {/* Main Content */}
+        <div className="flex gap-6">
+          {/* Filters Sidebar */}
+          <aside className="w-full lg:w-64 flex-shrink-0">
+            <FilterSidebar
+              onFilterChange={setFilters}
+              categories={['Electronics', 'Clothing', 'Home', 'Sports']}
+            />
+          </aside>
+
+          {/* Products Grid */}
+          <main className="flex-1">
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600">No products found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+COMPLETION CHECKLIST - SEARCH & FILTER UI
+────────────────────────────────────────────────────────────────────────────
+
+✅ Created FilterSidebar component
+✅ Created SearchBar component
+✅ Created useDebounce hook
+✅ Updated products page with filters
+✅ Category filter
+✅ Price range filter
+✅ Rating filter
+✅ In stock filter
+✅ Sort options
+✅ Search with debounce
+✅ Mobile-responsive filters
+
+Testing:
+□ Test search functionality
+□ Test category filter
+□ Test price range filter
+□ Test rating filter
+□ Test in stock filter
+□ Test sort options
+□ Test clear all filters
+□ Test mobile filter toggle
+
+Estimated Time: 2-3 hours
+Actual Time: _______
+
+================================================================================
+MASTER IMPLEMENTATION CHECKLIST
+================================================================================
+
+PRIORITY 1 - CRITICAL (12-16 hours):
+□ Customer Support Chat Widget (6-8 hours)
+□ Mobile Responsiveness (3-4 hours)
+□ Search & Filter UI (2-3 hours)
+
+PRIORITY 2 - IMPORTANT (8-12 hours):
+□ Review System (6-8 hours)
+□ Checkout Enhancements (2-3 hours)
+
+PRIORITY 3 - NICE TO HAVE (4-6 hours):
+□ Product Page Enhancements (2-3 hours)
+□ User Dashboard Enhancements (2-3 hours)
+
+TOTAL ESTIMATED TIME: 24-34 hours
+
+PROGRESS TRACKING:
+Current Frontend Completion: 65%
+After Priority 1: ~80%
+After Priority 2: ~90%
+After Priority 3: 100%
+
+================================================================================
+END OF IMPLEMENTATION GUIDES
+================================================================================
+
+All guides are complete and ready for implementation.
+Follow each guide step-by-step to achieve 100% frontend completion.
+
+For questions or issues, refer to:
+- AUTOMATION.txt for backend details
+- SETUP.txt for environment setup
+- DEPLOYMENT.txt for production deployment

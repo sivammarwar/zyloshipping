@@ -14,5 +14,8 @@
   "devDependencies": {
     "@types/node-cron": "^3.0.11",
     "concurrently": "^8.2.0"
+  },
+  "dependencies": {
+    "next-auth": "^4.24.13"
   }
 }

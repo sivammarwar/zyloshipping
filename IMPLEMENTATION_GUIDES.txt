@@ -1,0 +1,1077 @@
+================================================================================
+ZYLOSHIPPING - DETAILED IMPLEMENTATION GUIDES
+================================================================================
+Version: 1.3.1
+Date: March 29, 2026
+
+Complete step-by-step guides for implementing all remaining frontend features
+to achieve 100% completion.
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. Customer Support Chat Widget (6-8 hours)
+2. Review System (6-8 hours)
+3. Mobile Responsiveness (3-4 hours)
+4. Search & Filter UI (2-3 hours)
+5. Checkout Flow Enhancements (2-3 hours)
+6. Product Page Enhancements (2-3 hours)
+7. User Dashboard Enhancements (2-3 hours)
+
+Total Estimated Time: 24-34 hours
+
+================================================================================
+GUIDE 1: CUSTOMER SUPPORT CHAT WIDGET
+================================================================================
+Estimated Time: 6-8 hours
+Priority: HIGH
+Backend Status: ✅ Complete
+
+OVERVIEW:
+Build a full-page chat interface for customer support with AI-powered responses,
+message history, typing indicators, and escalation handling.
+
+────────────────────────────────────────────────────────────────────────────
+STEP 1: Create Chat Types and Interfaces (15 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/types/chat.ts
+
+export interface Message {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  requiresHuman?: boolean;
+  ticketId?: string;
+}
+
+export interface ChatResponse {
+  reply: string;
+  ticketId: string;
+  requiresHuman: boolean;
+  responseTime: number;
+}
+
+export interface ConversationHistory {
+  conversations: Array<{
+    ticketId: string;
+    ticketNumber: string;
+    userMessage: string;
+    aiReply: string;
+    status: string;
+    timestamp: Date;
+    orderId?: string;
+  }>;
+  total: number;
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 2: Create Chat API Client (20 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/lib/api/chat.ts
+
+import { ensureValidToken } from '../tokenManager';
+
+export async function sendChatMessage(
+  message: string,
+  orderId?: string
+): Promise<ChatResponse> {
+  const token = await ensureValidToken();
+  
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/support/chat`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify({ message, orderId }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to send message');
+  }
+
+  return response.json();
+}
+
+export async function getChatHistory(): Promise<ConversationHistory> {
+  const token = await ensureValidToken();
+  
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/support/chat/history`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch history');
+  }
+
+  return response.json();
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 3: Create Message Bubble Component (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/chat/MessageBubble.tsx
+
+'use client';
+
+import { Message } from '@/types/chat';
+import { formatDistanceToNow } from 'date-fns';
+
+interface MessageBubbleProps {
+  message: Message;
+}
+
+export function MessageBubble({ message }: MessageBubbleProps) {
+  const isAI = message.role === 'ai';
+  
+  return (
+    <div className={`flex ${isAI ? 'justify-start' : 'justify-end'} mb-4`}>
+      <div className={`max-w-[70%] ${isAI ? 'order-1' : 'order-2'}`}>
+        {/* Avatar */}
+        <div className={`flex items-start gap-2 ${isAI ? 'flex-row' : 'flex-row-reverse'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
+            isAI ? 'bg-gray-800' : 'bg-red-500'
+          }`}>
+            {isAI ? '🤖' : 'U'}
+          </div>
+          
+          {/* Message Content */}
+          <div className={`flex-1 ${isAI ? 'text-left' : 'text-right'}`}>
+            <div className={`inline-block px-4 py-3 rounded-lg ${
+              isAI 
+                ? 'bg-gray-800 text-white' 
+                : 'bg-red-500 text-white'
+            }`}>
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            </div>
+            
+            {/* Timestamp */}
+            <p className="text-xs text-gray-500 mt-1 px-1">
+              {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
+            </p>
+            
+            {/* Escalation Notice */}
+            {message.requiresHuman && message.ticketId && (
+              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  🎫 <strong>Ticket #{message.ticketId}</strong> created.
+                  <br />
+                  We'll email you within 24 hours.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 4: Create Typing Indicator Component (15 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/chat/TypingIndicator.tsx
+
+'use client';
+
+export function TypingIndicator() {
+  return (
+    <div className="flex justify-start mb-4">
+      <div className="flex items-start gap-2">
+        <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-white text-sm">
+          🤖
+        </div>
+        <div className="bg-gray-800 text-white px-4 py-3 rounded-lg">
+          <div className="flex gap-1">
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 5: Create Quick Reply Chips Component (20 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/chat/QuickReplyChips.tsx
+
+'use client';
+
+interface QuickReplyChipsProps {
+  onSelect: (message: string) => void;
+}
+
+export function QuickReplyChips({ onSelect }: QuickReplyChipsProps) {
+  const quickReplies = [
+    "Where's my order?",
+    "Return policy",
+    "Payment issue",
+    "Track order",
+  ];
+
+  return (
+    <div className="mb-6">
+      <p className="text-sm text-gray-600 mb-2">Quick help:</p>
+      <div className="flex flex-wrap gap-2">
+        {quickReplies.map((reply) => (
+          <button
+            key={reply}
+            onClick={() => onSelect(reply)}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full transition-colors"
+          >
+            {reply}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 6: Create Main Chat Page (2-3 hours)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/app/(store)/support/page.tsx
+
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { MessageBubble } from '@/components/chat/MessageBubble';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { QuickReplyChips } from '@/components/chat/QuickReplyChips';
+import { sendChatMessage, getChatHistory } from '@/lib/api/chat';
+import { Message } from '@/types/chat';
+import { useRouter } from 'next/navigation';
+import { getUserFromToken } from '@/lib/tokenManager';
+
+export default function SupportPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  // Check authentication
+  useEffect(() => {
+    const user = getUserFromToken();
+    if (!user) {
+      router.push('/login?redirect=/support');
+    }
+  }, [router]);
+
+  // Load chat history on mount
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
+
+  const loadHistory = async () => {
+    try {
+      const history = await getChatHistory();
+      
+      // Convert history to messages
+      const historyMessages: Message[] = history.conversations.flatMap(conv => [
+        {
+          id: `${conv.ticketId}-user`,
+          role: 'user' as const,
+          content: conv.userMessage,
+          timestamp: new Date(conv.timestamp),
+        },
+        {
+          id: `${conv.ticketId}-ai`,
+          role: 'ai' as const,
+          content: conv.aiReply || 'Processing...',
+          timestamp: new Date(conv.timestamp),
+          ticketId: conv.ticketNumber,
+        },
+      ]);
+      
+      setMessages(historyMessages);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+    }
+  };
+
+  const handleSend = async (messageText?: string) => {
+    const text = messageText || input.trim();
+    if (!text || isLoading) return;
+
+    // Hide quick replies after first message
+    setShowQuickReplies(false);
+
+    // Add user message
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: text,
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const response = await sendChatMessage(text);
+      
+      // Add AI response
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: response.reply,
+        timestamp: new Date(),
+        requiresHuman: response.requiresHuman,
+        ticketId: response.ticketId,
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      
+      // Add error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: "I'm sorry, I'm having trouble right now. Please try again or contact our support team directly.",
+        timestamp: new Date(),
+        requiresHuman: true,
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setShowQuickReplies(true);
+    setInput('');
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto p-4">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                💬 ZyloShipping Support
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                AI replies in seconds • 24/7
+              </p>
+            </div>
+            <button
+              onClick={handleNewChat}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
+            >
+              New Chat
+            </button>
+          </div>
+        </div>
+
+        {/* Chat Container */}
+        <div className="bg-white rounded-lg shadow-sm">
+          {/* Messages Area */}
+          <div className="h-[600px] overflow-y-auto p-6">
+            {/* Welcome Message */}
+            {messages.length === 0 && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-800 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl">
+                  🤖
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Hi! I'm ZyloBot
+                </h2>
+                <p className="text-gray-600 mb-6">
+                  How can I help you today?
+                </p>
+              </div>
+            )}
+
+            {/* Quick Replies */}
+            {showQuickReplies && messages.length === 0 && (
+              <QuickReplyChips onSelect={handleSend} />
+            )}
+
+            {/* Messages */}
+            {messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
+
+            {/* Typing Indicator */}
+            {isLoading && <TypingIndicator />}
+
+            {/* Auto-scroll anchor */}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="border-t border-gray-200 p-4">
+            <div className="flex gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                rows={1}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                style={{ minHeight: '48px', maxHeight: '120px' }}
+              />
+              <button
+                onClick={() => handleSend()}
+                disabled={!input.trim() || isLoading}
+                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+              >
+                →
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {input.length}/500 characters
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 7: Add Mobile Responsiveness (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+Update the chat page with mobile-specific styles:
+
+// In frontend/app/(store)/support/page.tsx
+// Update the chat container height for mobile:
+
+<div className="h-[600px] md:h-[600px] sm:h-[calc(100vh-200px)] overflow-y-auto p-6">
+
+// Update message bubbles for mobile:
+<div className={`max-w-[70%] md:max-w-[70%] sm:max-w-[85%]`}>
+
+// Update input area for mobile:
+<div className="border-t border-gray-200 p-4 sm:p-3">
+
+────────────────────────────────────────────────────────────────────────────
+STEP 8: Testing Checklist
+────────────────────────────────────────────────────────────────────────────
+
+□ Send a message and receive AI response
+□ Quick reply chips work
+□ Typing indicator appears while loading
+□ Messages auto-scroll to bottom
+□ New chat button clears messages
+□ Escalation banner shows when requiresHuman is true
+□ Character count updates correctly
+□ Enter key sends message
+□ Shift+Enter creates new line
+□ Mobile responsive layout works
+□ Chat history loads on page load
+□ Authentication required (redirects to login)
+
+────────────────────────────────────────────────────────────────────────────
+COMPLETION CHECKLIST
+────────────────────────────────────────────────────────────────────────────
+
+✅ Created chat types and interfaces
+✅ Created chat API client
+✅ Created MessageBubble component
+✅ Created TypingIndicator component
+✅ Created QuickReplyChips component
+✅ Created main chat page
+✅ Added mobile responsiveness
+✅ Tested all functionality
+
+Estimated Time: 6-8 hours
+Actual Time: _______
+
+================================================================================
+GUIDE 2: REVIEW SYSTEM
+================================================================================
+Estimated Time: 6-8 hours
+Priority: HIGH
+Backend Status: ⚠️ Needs Implementation
+
+OVERVIEW:
+Build a complete review system with backend API, review submission form,
+reviews display, AI auto-reply, and rating summaries.
+
+────────────────────────────────────────────────────────────────────────────
+PART A: BACKEND IMPLEMENTATION (2-3 hours)
+────────────────────────────────────────────────────────────────────────────
+
+STEP 1: Create Review Routes (1 hour)
+────────────────────────────────────────────────────────────────────────────
+
+File: backend/src/routes/reviews.routes.ts
+
+import { Router, Response } from 'express';
+import { z } from 'zod';
+import { prisma } from '../db/prisma';
+import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
+
+const router = Router();
+
+// ── POST /api/reviews ─────────────────────────────────────────
+router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+  const schema = z.object({
+    productId: z.string().uuid(),
+    rating: z.number().int().min(1).max(5),
+    title: z.string().max(100).optional(),
+    text: z.string().max(1000).optional(),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ 
+      error: 'Validation failed', 
+      details: parsed.error.flatten() 
+    });
+  }
+
+  const { productId, rating, title, text } = parsed.data;
+  const userId = req.user!.id;
+
+  try {
+    // Check if user has purchased this product
+    const purchase = await prisma.orderItem.findFirst({
+      where: {
+        productId,
+        order: {
+          userId,
+          status: { in: ['DELIVERED', 'COMPLETED'] },
+        },
+      },
+    });
+
+    if (!purchase) {
+      return res.status(403).json({ 
+        error: 'You must purchase this product before reviewing it' 
+      });
+    }
+
+    // Check if user has already reviewed this product
+    const existingReview = await prisma.review.findFirst({
+      where: { productId, userId },
+    });
+
+    if (existingReview) {
+      return res.status(400).json({ 
+        error: 'You have already reviewed this product' 
+      });
+    }
+
+    // Create review
+    const review = await prisma.review.create({
+      data: {
+        productId,
+        userId,
+        rating,
+        title,
+        text,
+        isVerifiedPurchase: true,
+      },
+    });
+
+    // Update product rating
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { avgRating: true, totalReviews: true },
+    });
+
+    if (product) {
+      const newTotalReviews = (product.totalReviews || 0) + 1;
+      const newAvgRating = 
+        ((product.avgRating || 0) * (product.totalReviews || 0) + rating) / 
+        newTotalReviews;
+
+      await prisma.product.update({
+        where: { id: productId },
+        data: {
+          avgRating: newAvgRating,
+          totalReviews: newTotalReviews,
+        },
+      });
+    }
+
+    // Trigger AI reply generation asynchronously
+    setImmediate(async () => {
+      try {
+        const { generateReviewReply } = await import(
+          '../agents/reviewReputation.agent'
+        );
+        await generateReviewReply(review.id);
+      } catch (error) {
+        console.error('[Review] AI reply generation failed:', error);
+      }
+    });
+
+    res.status(201).json({ 
+      review, 
+      message: 'Review submitted successfully!' 
+    });
+  } catch (error) {
+    console.error('[Review] Error:', error);
+    res.status(500).json({ error: 'Failed to submit review' });
+  }
+});
+
+// ── GET /api/reviews/:productId ───────────────────────────────
+router.get('/:productId', async (req, res: Response) => {
+  const { productId } = req.params;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const skip = (page - 1) * limit;
+
+  try {
+    // Get reviews
+    const reviews = await prisma.review.findMany({
+      where: { productId },
+      include: {
+        user: {
+          select: { name: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    });
+
+    // Get total count
+    const total = await prisma.review.count({
+      where: { productId },
+    });
+
+    // Get rating breakdown
+    const ratingBreakdown = await prisma.review.groupBy({
+      by: ['rating'],
+      where: { productId },
+      _count: { rating: true },
+    });
+
+    const breakdown: Record<string, number> = {
+      '5': 0,
+      '4': 0,
+      '3': 0,
+      '2': 0,
+      '1': 0,
+    };
+
+    ratingBreakdown.forEach(item => {
+      breakdown[item.rating.toString()] = item._count.rating;
+    });
+
+    // Get product rating
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { avgRating: true, totalReviews: true },
+    });
+
+    // Format reviews
+    const formattedReviews = reviews.map(review => ({
+      id: review.id,
+      rating: review.rating,
+      title: review.title,
+      text: review.text,
+      aiReply: review.aiReply,
+      userName: review.user.name?.split(' ')[0] || 'Anonymous',
+      isVerifiedPurchase: review.isVerifiedPurchase,
+      createdAt: review.createdAt,
+    }));
+
+    res.json({
+      reviews: formattedReviews,
+      avgRating: product?.avgRating || 0,
+      totalReviews: product?.totalReviews || 0,
+      ratingBreakdown: breakdown,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('[Review] Error fetching reviews:', error);
+    res.status(500).json({ error: 'Failed to fetch reviews' });
+  }
+});
+
+export default router;
+
+────────────────────────────────────────────────────────────────────────────
+STEP 2: Enhance Review Reputation Agent (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: backend/src/agents/reviewReputation.agent.ts
+
+import { prisma } from '../db/prisma';
+import { invokeGpt4o } from './llm';
+
+export async function generateReviewReply(reviewId: string): Promise<void> {
+  try {
+    const review = await prisma.review.findUnique({
+      where: { id: reviewId },
+      include: {
+        product: {
+          select: { title: true },
+        },
+      },
+    });
+
+    if (!review) {
+      console.error('[ReviewAgent] Review not found:', reviewId);
+      return;
+    }
+
+    const toneGuide: Record<number, string> = {
+      5: 'enthusiastic and genuinely grateful',
+      4: 'warm and appreciative',
+      3: 'understanding, ask what could be improved',
+      2: 'apologetic, offer to make it right',
+      1: 'very apologetic, offer refund or replacement',
+    };
+
+    const prompt = `You are a friendly customer service rep for ZyloShipping.
+Write a SHORT reply (max 80 words) to this product review.
+
+Product: ${review.product.title}
+Rating: ${review.rating}/5 stars
+Review Title: ${review.title || 'No title'}
+Review: "${review.text || 'No text provided'}"
+
+Tone: Be ${toneGuide[review.rating]}
+
+Rules:
+- Reference the product specifically
+- Be human and genuine (not robotic)
+- End with invitation to shop again
+- Never use "Thank you for your feedback" as opener
+- Keep it under 80 words`;
+
+    const { text } = await invokeGpt4o(
+      'review_reply',
+      'You are a helpful customer service representative.',
+      prompt
+    );
+
+    await prisma.review.update({
+      where: { id: reviewId },
+      data: { aiReply: text },
+    });
+
+    console.log(`[ReviewAgent] Generated reply for review ${reviewId}`);
+  } catch (error) {
+    console.error('[ReviewAgent] Error generating reply:', error);
+  }
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 3: Register Review Routes (5 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: backend/src/index.ts or backend/src/app.ts
+
+// Add this import
+import reviewsRouter from './routes/reviews.routes';
+
+// Add this route registration
+app.use('/api/reviews', reviewsRouter);
+
+────────────────────────────────────────────────────────────────────────────
+PART B: FRONTEND IMPLEMENTATION (4-5 hours)
+────────────────────────────────────────────────────────────────────────────
+
+STEP 4: Create Review Types (10 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/types/review.ts
+
+export interface Review {
+  id: string;
+  rating: number;
+  title?: string;
+  text?: string;
+  aiReply?: string;
+  userName: string;
+  isVerifiedPurchase: boolean;
+  createdAt: Date;
+}
+
+export interface ReviewsResponse {
+  reviews: Review[];
+  avgRating: number;
+  totalReviews: number;
+  ratingBreakdown: Record<string, number>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 5: Create Star Rating Component (30 minutes)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/reviews/StarRating.tsx
+
+'use client';
+
+import { useState } from 'react';
+
+interface StarRatingProps {
+  rating: number;
+  onRatingChange?: (rating: number) => void;
+  readonly?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+export function StarRating({ 
+  rating, 
+  onRatingChange, 
+  readonly = false,
+  size = 'md' 
+}: StarRatingProps) {
+  const [hoverRating, setHoverRating] = useState(0);
+  
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-6 h-6',
+    lg: 'w-8 h-8',
+  };
+
+  const handleClick = (value: number) => {
+    if (!readonly && onRatingChange) {
+      onRatingChange(value);
+    }
+  };
+
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((value) => {
+        const filled = value <= (hoverRating || rating);
+        
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => handleClick(value)}
+            onMouseEnter={() => !readonly && setHoverRating(value)}
+            onMouseLeave={() => !readonly && setHoverRating(0)}
+            disabled={readonly}
+            className={`${sizeClasses[size]} ${
+              readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'
+            } transition-transform`}
+          >
+            <svg
+              className={`w-full h-full ${
+                filled ? 'text-yellow-400' : 'text-gray-300'
+              }`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+────────────────────────────────────────────────────────────────────────────
+STEP 6: Create Review Form Component (1 hour)
+────────────────────────────────────────────────────────────────────────────
+
+File: frontend/components/reviews/ReviewForm.tsx
+
+'use client';
+
+import { useState } from 'react';
+import { StarRating } from './StarRating';
+import { ensureValidToken } from '@/lib/tokenManager';
+
+interface ReviewFormProps {
+  productId: string;
+  onSuccess: () => void;
+}
+
+export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
+  const [rating, setRating] = useState(0);
+  const [title, setTitle] = useState('');
+  const [text, setText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (rating === 0) {
+      setError('Please select a rating');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const token = await ensureValidToken();
+      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/reviews`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            productId,
+            rating,
+            title: title || undefined,
+            text: text || undefined,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to submit review');
+      }
+
+      // Reset form
+      setRating(0);
+      setTitle('');
+      setText('');
+      
+      // Call success callback
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit review');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        Write a Review
+      </h3>
+
+      {/* Rating */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Rating *
+        </label>
+        <StarRating rating={rating} onRatingChange={setRating} size="lg" />
+      </div>
+
+      {/* Title */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Title (optional)
+        </label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={100}
+          placeholder="Sum up your experience"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+      </div>
+
+      {/* Review Text */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Review (optional)
+        </label>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={1000}
+          rows={4}
+          placeholder="Share your thoughts about this product"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          {text.length}/1000 characters
+        </p>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={isSubmitting || rating === 0}
+        className="w-full px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+      >
+        {isSubmitting ? 'Submitting...' : 'Submit Review'}
+      </button>
+    </form>
+  );
+}
+
+[CONTINUED IN NEXT FILE DUE TO LENGTH...]
+
+================================================================================
+END OF IMPLEMENTATION_GUIDES.txt (Part 1 of 2)
+================================================================================
+
+This file continues in IMPLEMENTATION_GUIDES_PART2.txt with:
+- Review Display Components
+- Rating Summary
+- Mobile Responsiveness Guide
+- Search & Filter UI Guide
+- Checkout Enhancements Guide
+- Product Page Enhancements Guide
+- User Dashboard Guide
+- Master Implementation Checklist
+
+Total: 24-34 hours of detailed implementation guides

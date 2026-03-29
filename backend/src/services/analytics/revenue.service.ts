@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+import { cache } from '../../lib/cache';
 
 export type RevenuePeriod = 'day' | 'week' | 'month' | 'year';
 
@@ -66,4 +67,90 @@ export async function getRevenueTimeSeries(opts: {
       r => commMap.get(r.label.toISOString().slice(0, 10)) ?? 0
     ),
   };
+}
+
+/**
+ * Get today's revenue (cached for 5 minutes)
+ */
+export async function getTodayRevenue(): Promise<number> {
+  return cache.getOrSet(
+    'analytics:revenue:today',
+    async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const result = await prisma.order.aggregate({
+        where: {
+          createdAt: { gte: today },
+          status: { notIn: ['CANCELLED', 'REFUNDED'] },
+        },
+        _sum: { totalAmount: true },
+      });
+
+      return result._sum.totalAmount || 0;
+    },
+    300 // 5 minutes
+  );
+}
+
+/**
+ * Get this week's revenue (cached for 5 minutes)
+ */
+export async function getWeekRevenue(): Promise<number> {
+  return cache.getOrSet(
+    'analytics:revenue:week',
+    async () => {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      weekStart.setHours(0, 0, 0, 0);
+
+      const result = await prisma.order.aggregate({
+        where: {
+          createdAt: { gte: weekStart },
+          status: { notIn: ['CANCELLED', 'REFUNDED'] },
+        },
+        _sum: { totalAmount: true },
+      });
+
+      return result._sum.totalAmount || 0;
+    },
+    300 // 5 minutes
+  );
+}
+
+/**
+ * Get this month's revenue (cached for 5 minutes)
+ */
+export async function getMonthRevenue(): Promise<number> {
+  return cache.getOrSet(
+    'analytics:revenue:month',
+    async () => {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+
+      const result = await prisma.order.aggregate({
+        where: {
+          createdAt: { gte: monthStart },
+          status: { notIn: ['CANCELLED', 'REFUNDED'] },
+        },
+        _sum: { totalAmount: true },
+      });
+
+      return result._sum.totalAmount || 0;
+    },
+    300 // 5 minutes
+  );
+}
+
+/**
+ * Invalidate revenue cache after new order
+ * Call this after every confirmed payment
+ */
+export async function invalidateRevenueCache(): Promise<void> {
+  await Promise.all([
+    cache.del('analytics:revenue:today'),
+    cache.del('analytics:revenue:week'),
+    cache.del('analytics:revenue:month'),
+  ]);
 }

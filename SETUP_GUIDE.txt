@@ -592,10 +592,17 @@ STEP 7: VERIFY IT'S WORKING
    }
 
 3. Test admin login:
-   - Go to: http://localhost:3000/dashboard
+   - Go to: http://localhost:3000/login
    - Email: admin@zyloshipping.com
    - Password: @3088shivA+her
-   - Should see admin dashboard
+   - Should redirect to admin dashboard
+   
+   NOTE: Login page now uses real API authentication.
+   - JWT token stored in localStorage
+   - Token persists across sessions
+   - Use "Logout" button in dashboard to sign out
+   - If already logged in, /dashboard opens directly
+   - All dummy stats removed from login page
 
 4. Sync products (in admin dashboard):
    - Go to Products page
@@ -970,6 +977,7 @@ Important URLs (Local):
 - Backend: http://localhost:4000
 - Backend Health: http://localhost:4000/health
 - Prisma Studio: http://localhost:5555 (npx prisma studio)
+- Admin Login: http://localhost:3000/login
 - Admin Dashboard: http://localhost:3000/dashboard
 - Admin Pricing: http://localhost:3000/dashboard/pricing
 - Public Pricing: http://localhost:3000/pricing
