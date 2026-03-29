@@ -7,6 +7,8 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
       <MobileNav />
       {children}
       <BottomNav />
+      {/* Spacer so content isn't hidden behind fixed bottom nav on mobile */}
+      <div className="lg:hidden h-16" />
     </>
   );
 }

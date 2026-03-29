@@ -16,6 +16,7 @@
     "concurrently": "^8.2.0"
   },
   "dependencies": {
+    "date-fns": "^4.1.0",
     "next-auth": "^4.24.13"
   }
 }

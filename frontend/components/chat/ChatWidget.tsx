@@ -5,6 +5,7 @@ import { Message, ChatResponse } from '@/types/chat';
 import { MessageBubble } from './MessageBubble';
 import { QuickReplyChips } from './QuickReplyChips';
 import { TypingIndicator } from './TypingIndicator';
+import { getToken } from '@/lib/tokenManager';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const generateId = () => Math.random().toString(36).slice(2, 10);
@@ -14,11 +15,11 @@ const BACKEND_URL =
 
 // ─── component ────────────────────────────────────────────────────────────────
 export function ChatWidget() {
-  const [messages, setMessages]     = useState<Message[]>([]);
-  const [input, setInput]           = useState('');
-  const [isTyping, setIsTyping]     = useState(false);
-  const [error, setError]           = useState<string | null>(null);
-  const [isOnline, setIsOnline]     = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput]       = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -55,15 +56,14 @@ export function ChatWidget() {
     setIsTyping(true);
 
     try {
-      // Retrieve auth token if the user is logged in
-      const token = typeof window !== 'undefined'
-        ? localStorage.getItem('accessToken')
-        : null;
+      // ✅ Use tokenManager — reads 'auth_token' key, works for logged-in users
+      const token = getToken();
 
       const res = await fetch(`${BACKEND_URL}/api/support/chat`, {
-        method:  'POST',
+        method:      'POST',
+        credentials: 'include',
         headers: {
-          'Content-Type':  'application/json',
+          'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ message: trimmed }),
@@ -86,7 +86,7 @@ export function ChatWidget() {
 
       setMessages(prev => [...prev, aiMsg]);
       setIsOnline(true);
-    } catch (err) {
+    } catch {
       setIsOnline(false);
       const fallback: Message = {
         id:        generateId(),

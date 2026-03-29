@@ -1,4 +1,3 @@
-// frontend/types/chat.ts
 export interface Message {
   id: string;
   role: 'user' | 'ai';

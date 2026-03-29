@@ -4,14 +4,59 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const NAV_LINKS = [
-  { label: 'Products', href: '/products' },
-  { label: 'Track Order', href: '/track' },
-  { label: 'About', href: '/about' },
+  { label: 'Products',    href: '/products' },
+  { label: 'Track Order', href: '/track'    },
+  { label: 'About',       href: '/about'    },
 ];
+
+/** Reads cart item count from the API (or falls back to 0). */
+function useCartCount() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchCount() {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/cart`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!res.ok) return;
+
+        const data = await res.json();
+        // Handle both { items: [] } and { cart: { items: [] } } shapes
+        const items: Array<{ quantity: number }> =
+          data?.items ?? data?.cart?.items ?? [];
+        const total = items.reduce((s, i) => s + (i.quantity ?? 1), 0);
+
+        if (!cancelled) setCount(total);
+      } catch {
+        // ignore — badge just stays 0
+      }
+    }
+
+    fetchCount();
+
+    // Re-fetch when the custom 'cart-updated' event fires
+    const handler = () => fetchCount();
+    window.addEventListener('cart-updated', handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('cart-updated', handler);
+    };
+  }, []);
+
+  return count;
+}
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const cartCount = useCartCount();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -23,9 +68,7 @@ export default function Header() {
     <nav
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
+        top: 0, left: 0, right: 0,
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
@@ -53,94 +96,59 @@ export default function Header() {
         Zylo<span style={{ color: 'var(--red)' }}>.</span>
       </Link>
 
-      {/* Desktop nav links */}
+      {/* Desktop nav */}
       <ul
-        style={{
-          display: 'flex',
-          gap: '2rem',
-          listStyle: 'none',
-          alignItems: 'center',
-          margin: 0,
-          padding: 0,
-        }}
+        style={{ display: 'flex', gap: '2rem', listStyle: 'none', alignItems: 'center', margin: 0, padding: 0 }}
         className="hidden-mobile"
       >
-        {NAV_LINKS.map((link) => (
+        {NAV_LINKS.map(link => (
           <li key={link.href}>
             <Link
               href={link.href}
-              style={{
-                fontSize: '0.85rem',
-                fontWeight: 400,
-                color: 'var(--ink-muted)',
-                textDecoration: 'none',
-                letterSpacing: '0.02em',
-                transition: 'color 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--red)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-muted)')}
+              style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--ink-muted)', textDecoration: 'none', letterSpacing: '0.02em', transition: 'color 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
             >
               {link.label}
             </Link>
           </li>
         ))}
 
-        {/* Cart icon */}
+        {/* Cart */}
         <li>
           <Link
             href="/cart"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              color: 'var(--ink-muted)',
-              textDecoration: 'none',
-              transition: 'color 0.2s',
-              position: 'relative',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--red)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-muted)')}
+            style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-muted)', textDecoration: 'none', transition: 'color 0.2s', position: 'relative' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 1h2l2.4 10.8A2 2 0 0 0 7.4 13H14a2 2 0 0 0 1.97-1.67L17 6H4" />
               <circle cx="7.5" cy="16" r="1" />
               <circle cx="14.5" cy="16" r="1" />
             </svg>
-            {/* Cart badge */}
-            <span
-              style={{
-                position: 'absolute',
-                top: -6,
-                right: -6,
-                background: 'var(--red)',
-                color: 'var(--white)',
-                width: 14,
-                height: 14,
-                borderRadius: '50%',
-                fontSize: '0.6rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+            {cartCount > 0 && (
+              <span style={{
+                position: 'absolute', top: -6, right: -6,
+                background: 'var(--red)', color: 'var(--white)',
+                width: 16, height: 16, borderRadius: '50%',
+                fontSize: '0.58rem', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
                 fontWeight: 600,
-              }}
-            >
-              0
-            </span>
+              }}>
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
           </Link>
         </li>
 
-        {/* Profile/Login */}
+        {/* Profile */}
         <li>
           <Link
             href="/profile"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              color: 'var(--ink-muted)',
-              textDecoration: 'none',
-              transition: 'color 0.2s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--red)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-muted)')}
+            style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-muted)', textDecoration: 'none', transition: 'color 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="9" cy="6" r="3.5" />
@@ -149,20 +157,14 @@ export default function Header() {
           </Link>
         </li>
 
-        {/* Chat / Support icon */}
+        {/* Support */}
         <li>
           <Link
             href="/support"
             aria-label="Support chat"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              color: 'var(--ink-muted)',
-              textDecoration: 'none',
-              transition: 'color 0.2s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--red)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-muted)')}
+            style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-muted)', textDecoration: 'none', transition: 'color 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3l3 3 3-3h5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
@@ -177,106 +179,58 @@ export default function Header() {
           <Link
             href="/register"
             style={{
-              background: 'var(--red)',
-              color: 'var(--white)',
-              padding: '0.5rem 1.2rem',
-              borderRadius: 2,
-              fontWeight: 500,
-              fontSize: '0.82rem',
-              letterSpacing: '0.04em',
-              textDecoration: 'none',
+              background: 'var(--red)', color: 'var(--white)',
+              padding: '0.5rem 1.2rem', borderRadius: 2,
+              fontWeight: 500, fontSize: '0.82rem',
+              letterSpacing: '0.04em', textDecoration: 'none',
               transition: 'background 0.2s, transform 0.15s',
               display: 'inline-block',
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--red-deep)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--red)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-deep)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--red)';      e.currentTarget.style.transform = 'translateY(0)';   }}
           >
             Start Selling
           </Link>
         </li>
       </ul>
 
-      {/* Hamburger */}
+      {/* Hamburger (mobile) */}
       <button
-        onClick={() => setMenuOpen((v) => !v)}
-        style={{
-          display: 'none',
-          flexDirection: 'column',
-          gap: 5,
-          cursor: 'pointer',
-          background: 'none',
-          border: 'none',
-          padding: 0,
-        }}
+        onClick={() => setMenuOpen(v => !v)}
+        style={{ display: 'none', flexDirection: 'column', gap: 5, cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
         className="show-mobile"
         aria-label="Toggle menu"
       >
-        <span
-          style={{
-            display: 'block',
-            width: 22,
-            height: 1.5,
-            background: 'var(--ink)',
-            transition: 'all 0.25s',
-            transform: menuOpen ? 'rotate(45deg) translateY(6.5px)' : 'none',
-          }}
-        />
-        <span
-          style={{
-            display: 'block',
-            width: 22,
-            height: 1.5,
-            background: 'var(--ink)',
-            transition: 'all 0.25s',
-            opacity: menuOpen ? 0 : 1,
-          }}
-        />
-        <span
-          style={{
-            display: 'block',
-            width: 22,
-            height: 1.5,
-            background: 'var(--ink)',
-            transition: 'all 0.25s',
-            transform: menuOpen ? 'rotate(-45deg) translateY(-6.5px)' : 'none',
-          }}
-        />
+        {[
+          menuOpen ? 'rotate(45deg) translateY(6.5px)' : 'none',
+          undefined,
+          menuOpen ? 'rotate(-45deg) translateY(-6.5px)' : 'none',
+        ].map((transform, i) => (
+          <span key={i} style={{
+            display: 'block', width: 22, height: 1.5,
+            background: 'var(--ink)', transition: 'all 0.25s',
+            transform: transform ?? 'none',
+            opacity: i === 1 && menuOpen ? 0 : 1,
+          }} />
+        ))}
       </button>
 
-      {/* Mobile menu */}
+      {/* Mobile dropdown */}
       {menuOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '4rem',
-            left: 0,
-            right: 0,
-            background: 'var(--off-white)',
-            borderBottom: '1px solid var(--border)',
-            padding: '1.5rem 5vw',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-            zIndex: 99,
-          }}
-        >
-          {NAV_LINKS.map((link) => (
+        <div style={{
+          position: 'fixed', top: '4rem', left: 0, right: 0,
+          background: 'var(--off-white)', borderBottom: '1px solid var(--border)',
+          padding: '1.5rem 5vw', display: 'flex', flexDirection: 'column',
+          gap: '1rem', zIndex: 99,
+        }}>
+          {NAV_LINKS.map(link => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setMenuOpen(false)}
               style={{
-                fontSize: '1rem',
-                fontWeight: 400,
-                color: 'var(--ink-muted)',
-                textDecoration: 'none',
-                padding: '0.5rem 0',
+                fontSize: '1rem', fontWeight: 400, color: 'var(--ink-muted)',
+                textDecoration: 'none', padding: '0.5rem 0',
                 borderBottom: '1px solid var(--border)',
               }}
             >
@@ -284,43 +238,44 @@ export default function Header() {
             </Link>
           ))}
 
-          {/* Support link in mobile menu */}
           <Link
             href="/support"
             onClick={() => setMenuOpen(false)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              fontSize: '1rem',
-              fontWeight: 400,
-              color: 'var(--ink-muted)',
-              textDecoration: 'none',
-              padding: '0.5rem 0',
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              fontSize: '1rem', fontWeight: 400, color: 'var(--ink-muted)',
+              textDecoration: 'none', padding: '0.5rem 0',
               borderBottom: '1px solid var(--border)',
             }}
           >
             <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3l3 3 3-3h5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
-              <line x1="5" y1="7" x2="13" y2="7" />
-              <line x1="5" y1="10" x2="9" y2="10" />
+              <line x1="5" y1="7" x2="13" y2="7" /><line x1="5" y1="10" x2="9" y2="10" />
             </svg>
             Support
+          </Link>
+
+          <Link
+            href="/cart"
+            onClick={() => setMenuOpen(false)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              fontSize: '1rem', fontWeight: 400, color: 'var(--ink-muted)',
+              textDecoration: 'none', padding: '0.5rem 0',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            🛒 Cart{cartCount > 0 && ` (${cartCount})`}
           </Link>
 
           <Link
             href="/register"
             onClick={() => setMenuOpen(false)}
             style={{
-              background: 'var(--red)',
-              color: 'var(--white)',
-              padding: '0.75rem 1.5rem',
-              borderRadius: 2,
-              fontWeight: 500,
-              fontSize: '0.88rem',
-              textDecoration: 'none',
-              textAlign: 'center',
-              marginTop: '0.5rem',
+              background: 'var(--red)', color: 'var(--white)',
+              padding: '0.75rem 1.5rem', borderRadius: 2,
+              fontWeight: 500, fontSize: '0.88rem',
+              textDecoration: 'none', textAlign: 'center', marginTop: '0.5rem',
             }}
           >
             Start Selling
@@ -328,11 +283,10 @@ export default function Header() {
         </div>
       )}
 
-      {/* Mobile responsive styles */}
       <style>{`
         @media (max-width: 768px) {
           .hidden-mobile { display: none !important; }
-          .show-mobile { display: flex !important; }
+          .show-mobile   { display: flex !important; }
         }
         @media (min-width: 769px) {
           .show-mobile { display: none !important; }
