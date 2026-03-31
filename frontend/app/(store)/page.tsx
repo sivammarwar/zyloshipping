@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ProductCard from '@/components/store/ProductCard';
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { api } from '@/lib/api';
 
 interface Product {
@@ -650,6 +651,11 @@ export default function HomePage() {
             Browse products
           </Link>
         </div>
+      </section>
+
+      {/* ── CHAT WIDGET ── */}
+      <section style={{ padding: '0', background: 'var(--ink)', height: '600px' }}>
+        <ChatWidget />
       </section>
 
       <Footer />

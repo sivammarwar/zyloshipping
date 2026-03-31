@@ -7,6 +7,14 @@ import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { authLimiter } from '../middleware/rateLimiter.middleware';
+import { validate } from '../middleware/validate.middleware';
+import {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  updateProfileSchema
+} from '../schemas/auth.schema';
 import { sendPasswordResetEmail } from '../services/email/passwordReset';
 import { signTokenPair, setAuthCookies } from '../services/auth/token.service';
 import { redis, KEYS } from '../utils/redis';
@@ -19,20 +27,8 @@ import {
 const router = Router();
 
 // ── POST /api/auth/register ───────────────────────────────────
-router.post('/register', authLimiter, async (req: Request, res: Response) => {
-  const schema = z.object({
-    email:    z.string().email(),
-    password: z.string().min(8),
-    name:     z.string().min(1).optional(),
-    phone:    z.string().optional(),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-  }
-
-  const { email, password, name, phone } = parsed.data;
+router.post('/register', authLimiter, validate(registerSchema), async (req: Request, res: Response) => {
+  const { email, password, name, phone } = req.body;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -61,18 +57,8 @@ router.post('/register', authLimiter, async (req: Request, res: Response) => {
 });
 
 // ── POST /api/auth/login ──────────────────────────────────────
-router.post('/login', authLimiter, async (req: Request, res: Response) => {
-  const schema = z.object({
-    email:    z.string().email(),
-    password: z.string().min(1),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Email and password are required' });
-  }
-
-  const { email, password } = parsed.data;
+router.post('/login', authLimiter, validate(loginSchema), async (req: Request, res: Response) => {
+  const { email, password } = req.body;
 
   // Check if account is locked due to failed attempts
   if (await isAccountLocked(email)) {
@@ -136,12 +122,10 @@ router.post('/logout', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-router.post('/forgot-password', authLimiter, async (req: Request, res: Response) => {
-  const schema = z.object({ email: z.string().email() });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Valid email required' });
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req: Request, res: Response) => {
+  const { email } = req.body;
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const user = await prisma.user.findUnique({ where: { email } });
   if (user) {
     const raw = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(raw).digest('hex');
@@ -165,15 +149,9 @@ router.post('/forgot-password', authLimiter, async (req: Request, res: Response)
   res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' });
 });
 
-router.post('/reset-password', authLimiter, async (req: Request, res: Response) => {
-  const schema = z.object({
-    token: z.string().min(10),
-    password: z.string().min(8),
-  });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const tokenHash = crypto.createHash('sha256').update(parsed.data.token).digest('hex');
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req: Request, res: Response) => {
+  const { token, password } = req.body;
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const record = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
     include: { user: true },
@@ -182,7 +160,7 @@ router.post('/reset-password', authLimiter, async (req: Request, res: Response) 
     return res.status(400).json({ error: 'Invalid or expired token' });
   }
 
-  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const passwordHash = await bcrypt.hash(password, 12);
   await prisma.user.update({
     where: { id: record.userId },
     data: { passwordHash },
@@ -241,21 +219,10 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
 });
 
 // ── PATCH /api/auth/me ─────────────────────────────────────────
-router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    name:        z.string().min(1).optional(),
-    phone:       z.string().optional(),
-    addressJson: z.record(z.any()).optional(),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
+router.patch('/me', authMiddleware, validate(updateProfileSchema), async (req: AuthRequest, res: Response) => {
   const user = await prisma.user.update({
     where: { id: req.user!.id },
-    data: parsed.data,
+    data: req.body,
     select: { id: true, email: true, name: true, phone: true, role: true },
   });
   res.json({ user });

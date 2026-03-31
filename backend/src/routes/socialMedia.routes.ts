@@ -1,7 +1,14 @@
 import { Router, Response } from 'express';
-import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import {
+  createSocialAccountSchema,
+  updateSocialAccountSchema,
+  generatePostSchema,
+  createCampaignSchema,
+  updateCampaignSchema
+} from '../schemas/socialMedia.schema';
 import { generateProductContent, getTrendingProducts } from '../services/social/contentGenerator.service';
 import { instagramService } from '../services/social/instagram.service';
 import { facebookService } from '../services/social/facebook.service';
@@ -26,26 +33,9 @@ router.get('/accounts', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/accounts', async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    platform: z.enum(['INSTAGRAM', 'FACEBOOK', 'TWITTER']),
-    accountName: z.string().min(1),
-    accountHandle: z.string().min(1),
-    accountId: z.string().optional(),
-    accessToken: z.string().min(1),
-    refreshToken: z.string().optional(),
-    targetRegion: z.string().default('US'),
-    postingTimezone: z.string().default('America/New_York'),
-    postsPerDay: z.number().int().min(1).max(10).default(3),
-  });
-
+router.post('/accounts', validate(createSocialAccountSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-    }
-
-    const data = parsed.data;
+    const data = req.body;
 
     // Check if account already exists
     const existing = await prisma.socialMediaAccount.findFirst({
@@ -82,24 +72,11 @@ router.post('/accounts', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/accounts/:id', async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    isActive: z.boolean().optional(),
-    targetRegion: z.string().optional(),
-    postingTimezone: z.string().optional(),
-    postingTimes: z.array(z.string()).optional(),
-    postsPerDay: z.number().int().min(1).max(10).optional(),
-  });
-
+router.put('/accounts/:id', validate(updateSocialAccountSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-    }
-
     const account = await prisma.socialMediaAccount.update({
       where: { id: req.params.id },
-      data: parsed.data,
+      data: req.body,
     });
 
     res.json({ account, message: 'Account updated successfully' });
@@ -187,21 +164,9 @@ router.get('/posts/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    productIds: z.array(z.string()).optional(),
-    platform: z.enum(['INSTAGRAM', 'FACEBOOK', 'TWITTER']),
-    contentStyle: z.enum(['VIRAL_HOOK', 'EDUCATIONAL', 'PROMOTIONAL', 'STORYTELLING', 'TRENDING', 'CONTROVERSIAL']).default('VIRAL_HOOK'),
-    count: z.number().int().min(1).max(10).default(5),
-  });
-
+router.post('/posts/generate', validate(generatePostSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-    }
-
-    const { productIds, platform, contentStyle, count } = parsed.data;
+    const { productIds, platform, contentStyle, count } = req.body;
 
     // Get products
     let products;
@@ -294,29 +259,13 @@ router.get('/campaigns', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/campaigns', async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    accountId: z.string().min(1),
-    name: z.string().min(1),
-    description: z.string().optional(),
-    targetRegion: z.string().default('US'),
-    contentStyle: z.enum(['VIRAL_HOOK', 'EDUCATIONAL', 'PROMOTIONAL', 'STORYTELLING', 'TRENDING', 'CONTROVERSIAL']).default('VIRAL_HOOK'),
-    postsPerDay: z.number().int().min(1).max(10).default(3),
-    productCount: z.number().int().min(1).max(20).default(10),
-    startDate: z.string().transform(str => new Date(str)),
-    endDate: z.string().optional().transform(str => str ? new Date(str) : null),
-  });
-
+router.post('/campaigns', validate(createCampaignSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-    }
-
+    const data = req.body;
     const campaign = await prisma.socialMediaCampaign.create({
       data: {
-        ...parsed.data,
-        endDate: parsed.data.endDate || undefined,
+        ...data,
+        endDate: data.endDate || undefined,
       },
     });
 
@@ -327,24 +276,11 @@ router.post('/campaigns', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/campaigns/:id', async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    name: z.string().optional(),
-    description: z.string().optional(),
-    isActive: z.boolean().optional(),
-    contentStyle: z.enum(['VIRAL_HOOK', 'EDUCATIONAL', 'PROMOTIONAL', 'STORYTELLING', 'TRENDING', 'CONTROVERSIAL']).optional(),
-    postsPerDay: z.number().int().min(1).max(10).optional(),
-  });
-
+router.put('/campaigns/:id', validate(updateCampaignSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-    }
-
     const campaign = await prisma.socialMediaCampaign.update({
       where: { id: req.params.id },
-      data: parsed.data,
+      data: req.body,
     });
 
     res.json({ campaign, message: 'Campaign updated successfully' });

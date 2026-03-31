@@ -6,6 +6,7 @@ import { calculateCommission, reverseCommission } from '../services/commission.s
 import { decrementStockForOrder, restoreStockForOrder } from '../services/order/stockUpdate.service';
 import { trackOrderSales } from '../services/analytics/productMetrics.service';
 import { invalidateRevenueCache } from '../services/analytics/revenue.service';
+import { updateCustomerMetrics } from '../services/analytics/customer.service';
 import { getOrderAutomationQueue } from '../jobs/queue';
 import { sendOrderConfirmationEmail } from '../services/email/orderConfirmation';
 import { sendPaymentFailedEmail, sendRefundConfirmationEmail } from '../services/email.service';
@@ -126,6 +127,21 @@ async function processPaymentSuccess(orderId: string, gateway: 'razorpay' | 'str
     if (queue) {
       await queue.add('orderSubmission', { orderId });
     }
+
+    // 8. Update customer metrics (async, non-blocking)
+    setImmediate(async () => {
+      try {
+        const order = await prisma.order.findUnique({
+          where: { id: orderId },
+          select: { userId: true },
+        });
+        if (order?.userId) {
+          await updateCustomerMetrics(order.userId, orderId);
+        }
+      } catch (e) {
+        console.error('[webhook] customer metrics update failed:', e);
+      }
+    });
 
     console.log(`[webhook] Payment success processed for order ${orderId}`);
   } catch (error) {

@@ -1,25 +1,14 @@
 import { Router, Response } from 'express';
-import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { createReviewSchema } from '../schemas/review.schema';
 
 const router = Router();
 
 // ── POST /api/reviews ──────────────────────────────────────────
-router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    productId: z.string().min(1),
-    rating:    z.number().int().min(1).max(5),
-    title:     z.string().max(100).optional(),
-    text:      z.string().max(1000).optional(),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-  }
-
-  const { productId, rating, title, text } = parsed.data;
+router.post('/', authMiddleware, validate(createReviewSchema), async (req: AuthRequest, res: Response) => {
+  const { productId, rating, title, text } = req.body;
   const userId = req.user!.id;
 
   try {

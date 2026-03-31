@@ -4,6 +4,7 @@ import { getAliExpressAdapter } from '../services/supplier/aliexpress.adapter';
 import { getCjAdapter } from '../services/supplier/cj.adapter';
 import { isAliExpressConfigured } from '../utils/supplierConfig';
 import { checkAndCreateLowStockAlerts } from '../services/inventory/alerts.service';
+import { indexProduct } from '../services/algolia.service';
 
 export async function runInventorySyncJob(supplierId?: string): Promise<void> {
   const ae = getAliExpressAdapter();
@@ -24,13 +25,17 @@ export async function runInventorySyncJob(supplierId?: string): Promise<void> {
     const adapter = p.supplierId === 'cj' ? cj : ae;
     const stock = await adapter.checkStock(p.supplierSku || p.id).catch(() => null);
     if (stock == null) continue;
-    await prisma.product.update({
+    
+    const updated = await prisma.product.update({
       where: { id: p.id },
       data: {
         stockQuantity: stock,
         status: stock > 10 ? ProductStatus.ACTIVE : stock <= 0 ? ProductStatus.HIDDEN : ProductStatus.LOW,
       },
     });
+    
+    // Sync to Algolia when stock changes
+    await indexProduct(updated.id).catch(() => {});
   }
 
   // Check and create low stock alerts after sync

@@ -7,6 +7,15 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { authMiddleware, adminMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import {
+  addToCartSchema,
+  updateCartSchema,
+  couponSchema,
+  adminAddToCartSchema,
+  adminUpdateCartItemSchema,
+  adminCheckoutSchema
+} from '../schemas/cart.schema';
 import { redis, TTL } from '../utils/redis';
 import { CartStatus } from '@prisma/client';
 
@@ -56,15 +65,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 });
 
 async function postCartAdd(req: AuthRequest, res: Response) {
-  const schema = z.object({
-    productId: z.string(),
-    quantity: z.number().min(1).max(99),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const { productId, quantity } = parsed.data;
+  const { productId, quantity } = req.body;
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) return res.status(404).json({ error: 'Product not found' });
@@ -95,21 +96,17 @@ async function postCartAdd(req: AuthRequest, res: Response) {
   res.status(201).json({ success: true });
 }
 
-router.post('/add', authMiddleware, postCartAdd);
-router.post('/items', authMiddleware, postCartAdd);
+router.post('/add', authMiddleware, validate(addToCartSchema), postCartAdd);
+router.post('/items', authMiddleware, validate(addToCartSchema), postCartAdd);
 
 // ── PUT /api/cart/update (alias) ───────────────────────────────
-router.put('/update', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    productId: z.string(),
-    quantity: z.number().min(1),
-  });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  (req as AuthRequest & { params: { productId: string } }).params = {
-    productId: parsed.data.productId,
-  };
-  req.body = { quantity: parsed.data.quantity };
+router.put('/update', authMiddleware, validate(updateCartSchema), async (req: AuthRequest, res: Response) => {
+  const { productId } = req.query;
+  if (!productId || typeof productId !== 'string') {
+    return res.status(400).json({ error: 'productId query parameter required' });
+  }
+  (req as AuthRequest & { params: { productId: string } }).params = { productId };
+  req.body = { quantity: req.body.quantity };
   return patchCartItem(req, res);
 });
 
@@ -140,7 +137,7 @@ async function patchCartItem(req: AuthRequest, res: Response) {
   res.json({ success: true });
 }
 
-router.patch('/items/:productId', authMiddleware, patchCartItem);
+router.patch('/items/:productId', authMiddleware, validate(updateCartSchema), patchCartItem);
 
 async function deleteCartItem(req: AuthRequest, res: Response) {
   const cart = await prisma.cart.findUnique({ where: { userId: req.user!.id } });
@@ -220,16 +217,8 @@ router.get('/admin', authMiddleware, adminMiddleware, async (req: AuthRequest, r
 });
 
 // ── POST /api/cart/admin/items  (add item to admin cart) ──────
-router.post('/admin/items', authMiddleware, adminMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    productId: z.string(),
-    quantity:  z.number().min(1),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const { productId, quantity } = parsed.data;
+router.post('/admin/items', authMiddleware, adminMiddleware, validate(adminAddToCartSchema), async (req: AuthRequest, res: Response) => {
+  const { productId, quantity } = req.body;
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) return res.status(404).json({ error: 'Product not found' });
 
@@ -248,21 +237,13 @@ router.post('/admin/items', authMiddleware, adminMiddleware, async (req: AuthReq
 });
 
 // ── PATCH /api/cart/admin/items/:productId ─────────────────────
-router.patch('/admin/items/:productId', authMiddleware, adminMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    quantity:      z.number().min(1).optional(),
-    savedForLater: z.boolean().optional(),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
+router.patch('/admin/items/:productId', authMiddleware, adminMiddleware, validate(adminUpdateCartItemSchema), async (req: AuthRequest, res: Response) => {
   const cart = await prisma.adminCart.findUnique({ where: { adminUserId: req.user!.id } });
   if (!cart) return res.status(404).json({ error: 'Admin cart not found' });
 
   await prisma.adminCartItem.update({
     where: { adminCartId_productId: { adminCartId: cart.id, productId: req.params.productId } },
-    data:  parsed.data,
+    data:  req.body,
   });
 
   res.json({ success: true });
@@ -288,15 +269,8 @@ router.delete('/admin', authMiddleware, adminMiddleware, async (req: AuthRequest
 });
 
 // ── POST /api/cart/admin/checkout  (place admin order) ────────
-router.post('/admin/checkout', authMiddleware, adminMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    shippingAddress: z.record(z.any()),
-    couponCode:      z.string().optional(),
-    note:            z.string().optional(),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+router.post('/admin/checkout', authMiddleware, adminMiddleware, validate(adminCheckoutSchema), async (req: AuthRequest, res: Response) => {
+  const { shippingAddress, couponCode, note } = req.body;
 
   const adminCart = await prisma.adminCart.findUnique({
     where: { adminUserId: req.user!.id },
@@ -313,7 +287,7 @@ router.post('/admin/checkout', authMiddleware, adminMiddleware, async (req: Auth
   const settings = await prisma.storeSettings.findUnique({ where: { id: 'singleton' } });
   const shippingAmount = subtotal > (settings?.freeShippingThreshold ?? 200) ? 0 : (settings?.defaultShippingRate ?? 9.99);
   let discountAmount = 0;
-  if (parsed.data.couponCode && settings?.activeCouponCode === parsed.data.couponCode) {
+  if (couponCode && settings?.activeCouponCode === couponCode) {
     discountAmount = subtotal * (settings.couponDiscountPct / 100);
   }
 
@@ -327,11 +301,11 @@ router.post('/admin/checkout', authMiddleware, adminMiddleware, async (req: Auth
       userId: req.user!.id,
       status: 'PENDING',
       totalAmount: subtotal - discountAmount + shippingAmount,
-      shippingAddressJson: parsed.data.shippingAddress,
+      shippingAddressJson: shippingAddress,
       shippingAmount,
       discountAmount,
-      couponCode: parsed.data.couponCode,
-      note: parsed.data.note,
+      couponCode,
+      note,
       isAdminOrder: true,
       items: {
         create: activeItems.map(item => ({

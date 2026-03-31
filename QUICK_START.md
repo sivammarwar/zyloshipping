@@ -1,8 +1,8 @@
 ================================================================================
 ZYLOSHIPPING - QUICK START GUIDE
 ================================================================================
-Version: 1.3.1
-Last Updated: March 29, 2026
+Version: 1.5.0
+Last Updated: April 1, 2026
 
 Get ZyloShipping running in 15 minutes!
 
@@ -120,6 +120,7 @@ STEP 6: VERIFY INSTALLATION (3 minutes)
 3. Test admin login (if you ran seed):
    Email: admin@zyloshipping.com
    Password: Admin@123
+   (Will redirect to /dashboard after login)
 
 4. Browse products:
    http://localhost:3000/products
@@ -128,16 +129,24 @@ STEP 6: VERIFY INSTALLATION (3 minutes)
 WHAT'S WORKING NOW
 ================================================================================
 
-✅ User registration & login
-✅ Product browsing
-✅ Shopping cart
-✅ Checkout (needs payment keys)
-✅ Order management
-✅ Admin dashboard
-✅ Product search
-✅ Inventory sync
-✅ AI-powered features (needs GROQ_API_KEY)
-✅ Email notifications (needs RESEND_API_KEY)
+✅ User registration & login (with Zod validation)
+✅ Product browsing (with Algolia search)
+✅ Shopping cart (with centralized validation)
+✅ Checkout with payment processing (Razorpay, Stripe)
+✅ Order management (with validation)
+✅ Admin dashboard (protected routes)
+✅ Product search (Algolia-powered)
+✅ Inventory sync (with Algolia auto-sync)
+✅ AI-powered features (Groq AI integrated)
+✅ Email notifications (7 templates)
+✅ Review system (frontend + backend)
+✅ Customer support chat widget
+✅ JWT auto-refresh (tokenManager)
+✅ Admin alerts on service failure
+✅ Customer metrics tracking
+✅ Cloudflare R2 image upload
+✅ Social media automation
+✅ Product comparison tool
 
 ================================================================================
 NEXT STEPS
@@ -161,10 +170,18 @@ NEXT STEPS
    - Add CJ_EMAIL and CJ_PASSWORD to backend/.env
 
 5. Read Full Documentation:
-   - SETUP.txt - Complete setup guide
-   - AUTOMATION.txt - Automation features
-   - DEPLOYMENT.txt - Production deployment
-   - IMPLEMENTATION.txt - Feature inventory
+   - AUTOMATION.md - Learn about automation features
+   - FINAL_STATUS_v2.0.md - Check project status
+   - README.md - Full project overview
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+TypeScript Errors:
+→ Run: cd backend && npx tsc --noEmit
+→ Run: cd frontend && npx tsc --noEmit
+→ Most lint warnings are non-breaking
 
 ================================================================================
 COMMON ISSUES
@@ -316,11 +333,10 @@ GETTING HELP
 ================================================================================
 
 Documentation:
-□ SETUP.txt - Full setup guide
-□ AUTOMATION.txt - Automation features
-□ DEPLOYMENT.txt - Production deployment
-□ IMPLEMENTATION.txt - Feature inventory
-□ FINAL_SUMMARY.txt - Project overview
+□ QUICK_START.md - This file
+□ AUTOMATION.md - Automation features
+□ FINAL_STATUS_v2.0.md - Project status & roadmap
+□ README.md - Full project overview
 
 Common Issues:
 □ Check logs in terminal
@@ -332,7 +348,6 @@ Common Issues:
 Support:
 □ Email: support@zyloshipping.com
 □ GitHub Issues: [repository-url]/issues
-□ Documentation: See above files
 
 ================================================================================
 SUCCESS CHECKLIST
@@ -357,10 +372,10 @@ WHAT'S NEXT?
 Now that you have ZyloShipping running:
 
 1. Explore the Admin Dashboard:
-   http://localhost:3000/dashboard
+   http://localhost:3000/dashboard (requires login)
 
 2. Test the Customer Flow:
-   - Browse products
+   - Browse products with comparison
    - Add to cart
    - Checkout (with test payment keys)
 
@@ -371,9 +386,8 @@ Now that you have ZyloShipping running:
    - Add supplier credentials
 
 4. Read the Documentation:
-   - AUTOMATION.txt - Learn about automation features
-   - DEPLOYMENT.txt - Plan production deployment
-   - IMPLEMENTATION.txt - Understand the codebase
+   - AUTOMATION.md - Learn about automation
+   - FINAL_STATUS_v2.0.md - Check roadmap
 
 5. Start Developing:
    - Add new features

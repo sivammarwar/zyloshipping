@@ -21,3 +21,20 @@ export const couponSchema = z.object({
     .max(20, 'Coupon code too long')
     .transform(val => val.toUpperCase())
 });
+
+// Admin cart schemas
+export const adminAddToCartSchema = z.object({
+  productId: z.string().uuid('Invalid product ID'),
+  quantity: z.number().int().min(1, 'Minimum quantity is 1')
+});
+
+export const adminUpdateCartItemSchema = z.object({
+  quantity: z.number().int().min(1).optional(),
+  savedForLater: z.boolean().optional()
+});
+
+export const adminCheckoutSchema = z.object({
+  shippingAddress: z.record(z.any()),
+  couponCode: z.string().optional(),
+  note: z.string().max(500, 'Note too long').optional()
+});

@@ -1,24 +1,17 @@
 import { Router, Response } from 'express';
-import { z } from 'zod';
 import { TicketStatus } from '@prisma/client';
 import { prisma } from '../db/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { supportChatSchema, supportTicketSchema } from '../schemas/support.schema';
 import { runCustomerSupportAgent } from '../agents/customerSupport.agent';
 import { sendAlertEmail } from '../services/email.service';
 
 const router = Router();
 
 // ── POST /api/support/chat ────────────────────────────────────
-router.post('/chat', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    message: z.string().min(1, 'Message is required'),
-    orderId: z.string().optional(),
-  });
-  
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
-  }
+router.post('/chat', authMiddleware, validate(supportChatSchema), async (req: AuthRequest, res: Response) => {
+  const { message, orderId } = req.body;
 
   try {
     // Fetch user's recent orders for context
@@ -56,8 +49,8 @@ router.post('/chat', authMiddleware, async (req: AuthRequest, res: Response) => 
         freeShipping: 'Free shipping on orders over ₹999',
         deliveryTime: 'Typical delivery: 7-14 business days',
       },
-      message: parsed.data.message,
-      orderId: parsed.data.orderId,
+      message: message,
+      orderId: orderId,
     };
 
     // Call Customer Support Agent
@@ -80,8 +73,8 @@ router.post('/chat', authMiddleware, async (req: AuthRequest, res: Response) => 
         data: {
           ticketNumber,
           userId: req.user!.id,
-          orderId: parsed.data.orderId,
-          message: parsed.data.message,
+          orderId: orderId,
+          message: message,
           aiResponse: aiResult.reply,
           status: TicketStatus.ESCALATED,
         },
@@ -94,7 +87,7 @@ router.post('/chat', authMiddleware, async (req: AuthRequest, res: Response) => 
         try {
           await sendAlertEmail(
             `🎫 New Support Ticket Escalated — ${ticketNumber}`,
-            `Ticket ${ticketNumber} requires human attention.\n\nMessage: ${parsed.data.message}\n${parsed.data.orderId ? `Order ID: ${parsed.data.orderId}` : ''}\n\nView in admin: ${process.env.NEXT_PUBLIC_APP_URL || 'https://zyloshipping.com'}/dashboard/support`
+            `Ticket ${ticketNumber} requires human attention.\n\nMessage: ${message}\n${orderId ? `Order ID: ${orderId}` : ''}\n\nView in admin: ${process.env.NEXT_PUBLIC_APP_URL || 'https://zyloshipping.com'}/dashboard/support`
           );
         } catch (e) {
           console.error('[Support] Failed to send admin alert email:', e);
@@ -109,8 +102,8 @@ router.post('/chat', authMiddleware, async (req: AuthRequest, res: Response) => 
         data: {
           ticketNumber,
           userId: req.user!.id,
-          orderId: parsed.data.orderId,
-          message: parsed.data.message,
+          orderId: orderId,
+          message: message,
           aiResponse: aiResult.reply,
           status: TicketStatus.RESOLVED,
         },
@@ -171,15 +164,8 @@ router.get('/chat/history', authMiddleware, async (req: AuthRequest, res: Respon
   }
 });
 
-router.post('/ticket', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    message: z.string().min(1),
-    orderId: z.string().optional(),
-  });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
+router.post('/ticket', authMiddleware, validate(supportTicketSchema), async (req: AuthRequest, res: Response) => {
+  const { message, orderId } = req.body;
 
   const count = await prisma.supportTicket.count();
   const ticketNumber = `#${2841 + count}`;
@@ -201,8 +187,8 @@ router.post('/ticket', authMiddleware, async (req: AuthRequest, res: Response) =
         freeShipping: 'Free shipping over ₹999',
         deliveryTime: '7-14 business days',
       },
-      message: parsed.data.message,
-      orderId: parsed.data.orderId,
+      message: message,
+      orderId: orderId,
     });
     aiResponse = result.reply;
   } catch {
@@ -213,8 +199,8 @@ router.post('/ticket', authMiddleware, async (req: AuthRequest, res: Response) =
     data: {
       ticketNumber,
       userId: req.user!.id,
-      orderId: parsed.data.orderId,
-      message: parsed.data.message,
+      orderId: orderId,
+      message: message,
       aiResponse,
       status: TicketStatus.OPEN,
     },

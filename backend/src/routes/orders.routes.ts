@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
-import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { authMiddleware, adminMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { createOrderSchema, refundSchema, bulkOrderUpdateSchema } from '../schemas/order.schema';
 import { OrderStatus } from '@prisma/client';
 import { getOrderTracking } from '../controllers/order.controller';
 import { transitionOrder } from '../services/order/stateMachine';
@@ -81,25 +82,7 @@ router.get('/stats', authMiddleware, adminMiddleware, async (_req: AuthRequest, 
 });
 
 async function createOrderHandler(req: AuthRequest, res: Response) {
-  const schema = z.object({
-    items: z.array(
-      z.object({
-        productId: z.string(),
-        quantity: z.number().min(1),
-      })
-    ),
-    shippingAddress: z.record(z.any()),
-    couponCode: z.string().optional(),
-    note: z.string().optional(),
-    isAdminOrder: z.boolean().optional(),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
-  const { items, shippingAddress, couponCode, note, isAdminOrder } = parsed.data;
+  const { items, shippingAddress, couponCode, note, isAdminOrder } = req.body;
 
   const products = await prisma.product.findMany({
     where: { id: { in: items.map(i => i.productId) } },
@@ -167,8 +150,8 @@ async function createOrderHandler(req: AuthRequest, res: Response) {
   res.status(201).json({ order });
 }
 
-router.post('/create', authMiddleware, createOrderHandler);
-router.post('/', authMiddleware, createOrderHandler);
+router.post('/create', authMiddleware, validate(createOrderSchema), createOrderHandler);
+router.post('/', authMiddleware, validate(createOrderSchema), createOrderHandler);
 
 router.put('/:id/cancel', authMiddleware, async (req: AuthRequest, res: Response) => {
   if (!isOrderNumber(req.params.id)) {
@@ -289,16 +272,8 @@ router.post('/:id/refund', authMiddleware, async (req: AuthRequest, res: Respons
   }
 });
 
-router.post('/bulk', authMiddleware, adminMiddleware, async (req: AuthRequest, res: Response) => {
-  const schema = z.object({
-    orderNumbers: z.array(z.string()),
-    status: z.nativeEnum(OrderStatus),
-  });
-
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const { orderNumbers, status } = parsed.data;
+router.post('/bulk', authMiddleware, adminMiddleware, validate(bulkOrderUpdateSchema), async (req: AuthRequest, res: Response) => {
+  const { orderNumbers, status } = req.body;
 
   await prisma.order.updateMany({
     where: { orderNumber: { in: orderNumbers } },
