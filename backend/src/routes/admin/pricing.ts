@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { prisma } from '../../lib/prisma';
-import { adminAuth } from '../../middleware/auth';
+import { prisma } from '../../db/prisma';
+import { authMiddleware, adminMiddleware } from '../../middleware/auth.middleware';
+const adminAuth = [authMiddleware, adminMiddleware];
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/admin/pricing/:id - Get single plan
-router.get('/:id', adminAuth, async (req, res) => {
+router.get('/:id', adminAuth, async (req: Request, res: Response) => {
   try {
     const plan = await prisma.pricingPlan.findUnique({
       where: { id: req.params.id },
@@ -55,7 +56,7 @@ router.get('/:id', adminAuth, async (req, res) => {
 });
 
 // POST /api/admin/pricing - Create new plan
-router.post('/', adminAuth, async (req, res) => {
+router.post('/', adminAuth, async (req: Request, res: Response) => {
   try {
     const data = createPlanSchema.parse(req.body);
 
@@ -86,7 +87,7 @@ router.post('/', adminAuth, async (req, res) => {
 });
 
 // PUT /api/admin/pricing/:id - Update plan
-router.put('/:id', adminAuth, async (req, res) => {
+router.put('/:id', adminAuth, async (req: Request, res: Response) => {
   try {
     const data = updatePlanSchema.parse(req.body);
 
@@ -106,7 +107,7 @@ router.put('/:id', adminAuth, async (req, res) => {
 });
 
 // DELETE /api/admin/pricing/:id - Delete plan
-router.delete('/:id', adminAuth, async (req, res) => {
+router.delete('/:id', adminAuth, async (req: Request, res: Response) => {
   try {
     await prisma.pricingPlan.delete({
       where: { id: req.params.id },

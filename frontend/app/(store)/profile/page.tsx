@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import UserAuthGuard from '@/components/auth/UserAuthGuard';
 import { getOrders, OrderSummary } from '@/lib/api/orders';
-import { getUserFromToken } from '@/lib/tokenManager';
-import { clearAuth } from '@/lib/tokenManager';
+import { getUserFromToken, clearAuth } from '@/lib/tokenManager';
 
 type Tab = 'overview' | 'orders' | 'addresses' | 'wishlist';
 
@@ -29,32 +29,31 @@ const MOCK_ADDRESSES = [
   { id: '1', label: 'Home', line1: '123 Oak Street', line2: 'Apt 4B', city: 'New York', state: 'NY', zip: '10001', country: 'United States', default: true },
 ];
 
-export default function ProfilePage() {
-  const router                      = useRouter();
-  const [tab, setTab]               = useState<Tab>('overview');
-  const [editMode, setEditMode]     = useState(false);
-  const [orders, setOrders]         = useState<OrderSummary[]>([]);
+function ProfileContent() {
+  const router                            = useRouter();
+  const [tab, setTab]                     = useState<Tab>('overview');
+  const [editMode, setEditMode]           = useState(false);
+  const [orders, setOrders]               = useState<OrderSummary[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [totalOrders, setTotalOrders]     = useState(0);
   const [totalSpent, setTotalSpent]       = useState(0);
-  const [name, setName]             = useState('');
-  const [phone, setPhone]           = useState('');
-  const [email, setEmail]           = useState('');
+  const [name, setName]                   = useState('');
+  const [phone, setPhone]                 = useState('');
+  const [email, setEmail]                 = useState('');
 
   const user = getUserFromToken();
 
   useEffect(() => {
     if (!user) { router.push('/login?redirect=/profile'); return; }
     setEmail(user.email);
-    setName(user.email.split('@')[0]); // fallback until profile API exists
+    setName(user.email.split('@')[0]);
 
     (async () => {
       try {
         const res = await getOrders({ page: 1, limit: 10 });
         setOrders(res.orders);
         setTotalOrders(res.pagination.total);
-        const spent = res.orders.reduce((s, o) => s + o.totalAmount, 0);
-        setTotalSpent(spent);
+        setTotalSpent(res.orders.reduce((s, o) => s + o.totalAmount, 0));
       } catch {
         setOrders([]);
       } finally {
@@ -80,10 +79,9 @@ export default function ProfilePage() {
   return (
     <>
       <Header />
-
       <main style={{ paddingTop: '5rem', background: 'var(--off-white)', minHeight: '100vh' }}>
 
-        {/* ── Hero banner ── */}
+        {/* Hero */}
         <div style={{ background: 'var(--ink)', padding: '3rem 4vw 4rem', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: -80, right: -80, width: 300, height: 300, borderRadius: '50%', background: 'var(--red)', opacity: 0.07 }} />
           <div style={{ position: 'absolute', bottom: -60, left: -60, width: 200, height: 200, borderRadius: '50%', border: '40px solid rgba(255,255,255,0.04)' }} />
@@ -109,26 +107,15 @@ export default function ProfilePage() {
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-              <button
-                onClick={() => setEditMode(v => !v)}
-                style={{ padding: '0.55rem 1.2rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 2, color: 'rgba(255,255,255,0.75)', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'background 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-              >
+              <button onClick={() => setEditMode(v => !v)} style={{ padding: '0.55rem 1.2rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 2, color: 'rgba(255,255,255,0.75)', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
                 {editMode ? 'Cancel' : 'Edit Profile'}
               </button>
-              <button
-                onClick={handleLogout}
-                style={{ padding: '0.55rem 1.2rem', background: 'rgba(196,30,58,0.2)', border: '1px solid rgba(196,30,58,0.4)', borderRadius: 2, color: '#fca5a5', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'background 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(196,30,58,0.35)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(196,30,58,0.2)'}
-              >
+              <button onClick={handleLogout} style={{ padding: '0.55rem 1.2rem', background: 'rgba(196,30,58,0.2)', border: '1px solid rgba(196,30,58,0.4)', borderRadius: 2, color: '#fca5a5', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(196,30,58,0.35)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(196,30,58,0.2)'}>
                 Sign out
               </button>
             </div>
           </div>
 
-          {/* Stats */}
           <div style={{ display: 'flex', gap: '2.5rem', marginTop: '2rem', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
             {[
               { label: 'Total Orders', val: ordersLoading ? '—' : totalOrders },
@@ -142,14 +129,10 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ── Tabs ── */}
+        {/* Tabs */}
         <div style={{ background: 'var(--white)', borderBottom: '1px solid var(--border)', padding: '0 4vw', display: 'flex', gap: 0, overflowX: 'auto' }}>
           {TABS.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{ padding: '1rem 1.5rem', background: 'none', border: 'none', borderBottom: `2px solid ${tab === t.key ? 'var(--red)' : 'transparent'}`, fontSize: '0.82rem', fontWeight: tab === t.key ? 500 : 300, color: tab === t.key ? 'var(--red)' : 'var(--ink-muted)', cursor: 'pointer', fontFamily: 'var(--sans)', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', transition: 'color 0.2s', marginBottom: -1 }}
-            >
+            <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '1rem 1.5rem', background: 'none', border: 'none', borderBottom: `2px solid ${tab === t.key ? 'var(--red)' : 'transparent'}`, fontSize: '0.82rem', fontWeight: tab === t.key ? 500 : 300, color: tab === t.key ? 'var(--red)' : 'var(--ink-muted)', cursor: 'pointer', fontFamily: 'var(--sans)', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', transition: 'color 0.2s', marginBottom: -1 }}>
               <span>{t.icon}</span> {t.label}
             </button>
           ))}
@@ -157,11 +140,9 @@ export default function ProfilePage() {
 
         <div style={{ padding: '2.5rem 4vw 5rem', maxWidth: 900, margin: '0 auto' }}>
 
-          {/* ── OVERVIEW ── */}
+          {/* OVERVIEW */}
           {tab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-              {/* Edit form */}
               {editMode && (
                 <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.75rem' }}>
                   <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1.25rem' }}>Edit Profile</h2>
@@ -180,16 +161,10 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* Account details */}
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.75rem' }}>
                 <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1.25rem' }}>Account Details</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }} className="profile-grid">
-                  {[
-                    { label: 'Name',    val: name || '—' },
-                    { label: 'Email',   val: email },
-                    { label: 'Phone',   val: phone || '—' },
-                    { label: 'Role',    val: user?.role ?? '—' },
-                  ].map(item => (
+                  {[{ label: 'Name', val: name || '—' }, { label: 'Email', val: email }, { label: 'Phone', val: phone || '—' }, { label: 'Role', val: user?.role ?? '—' }].map(item => (
                     <div key={item.label}>
                       <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.25rem' }}>{item.label}</div>
                       <div style={{ fontSize: '0.88rem', color: 'var(--ink)' }}>{item.val}</div>
@@ -198,7 +173,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Recent orders */}
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                   <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--ink)' }}>Recent Orders</h2>
@@ -219,7 +193,7 @@ export default function ProfilePage() {
                           <div>
                             <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--ink)', marginBottom: '0.2rem' }}>#{o.orderNumber}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--ink-faint)', fontWeight: 300 }}>
-                              {o.items?.[0]?.product?.title}{o.items?.length > 1 ? ` + ${o.items.length - 1} more` : ''} · {new Date(o.createdAt).toLocaleDateString()}
+                              {o.items?.[0]?.product?.title}{(o.items?.length ?? 0) > 1 ? ` + ${o.items.length - 1} more` : ''} · {new Date(o.createdAt).toLocaleDateString()}
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -233,12 +207,11 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Quick actions */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }} className="quick-actions">
                 {[
-                  { icon: '💬', label: 'Support',         href: '/support' },
-                  { icon: '📦', label: 'Track Orders',    href: '/orders' },
-                  { icon: '🛍', label: 'Shop Products',   href: '/products' },
+                  { icon: '💬', label: 'Support',       href: '/support'  },
+                  { icon: '📦', label: 'Track Orders',  href: '/orders'   },
+                  { icon: '🛍', label: 'Shop Products', href: '/products' },
                 ].map(a => (
                   <Link key={a.label} href={a.href} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, textDecoration: 'none', fontSize: '0.85rem', color: 'var(--ink)', fontWeight: 400, transition: 'border-color 0.2s, color 0.2s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--red)'; e.currentTarget.style.color = 'var(--red)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--ink)'; }}>
                     <span style={{ fontSize: '1.2rem' }}>{a.icon}</span> {a.label}
@@ -248,14 +221,13 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* ── ORDERS ── */}
+          {/* ORDERS */}
           {tab === 'orders' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.3rem', fontWeight: 700, color: 'var(--ink)' }}>All Orders</h2>
                 <span style={{ fontSize: '0.8rem', color: 'var(--ink-faint)' }}>{totalOrders} total</span>
               </div>
-
               {ordersLoading ? (
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--ink-faint)' }}>Loading…</div>
               ) : orders.length === 0 ? (
@@ -267,18 +239,18 @@ export default function ProfilePage() {
                   {orders.map(o => {
                     const s = STATUS_STYLE[o.status] ?? STATUS_STYLE.PENDING;
                     return (
-                      <div key={o.id} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                      <Link key={o.id} href={`/orders/${o.id}`} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', textDecoration: 'none' }}>
                         <div>
                           <div style={{ fontFamily: 'var(--serif)', fontSize: '1rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '0.2rem' }}>#{o.orderNumber}</div>
                           <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)' }}>
-                            {o.items?.[0]?.product?.title}{o.items?.length > 1 ? ` + ${o.items.length - 1} more` : ''} · {new Date(o.createdAt).toLocaleDateString()}
+                            {o.items?.[0]?.product?.title}{(o.items?.length ?? 0) > 1 ? ` + ${o.items.length - 1} more` : ''} · {new Date(o.createdAt).toLocaleDateString()}
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <span style={{ fontSize: '0.65rem', fontWeight: 500, padding: '0.22rem 0.55rem', borderRadius: 1, background: s.bg, color: s.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</span>
                           <span style={{ fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--red)', fontSize: '1.05rem' }}>${o.totalAmount.toFixed(2)}</span>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -286,7 +258,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* ── ADDRESSES ── */}
+          {/* ADDRESSES */}
           {tab === 'addresses' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -313,7 +285,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* ── WISHLIST ── */}
+          {/* WISHLIST */}
           {tab === 'wishlist' && (
             <div>
               <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.3rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1.5rem' }}>Saved Items</h2>
@@ -327,7 +299,6 @@ export default function ProfilePage() {
           )}
         </div>
       </main>
-
       <Footer />
 
       <style>{`
@@ -337,5 +308,13 @@ export default function ProfilePage() {
         }
       `}</style>
     </>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <UserAuthGuard>
+      <ProfileContent />
+    </UserAuthGuard>
   );
 }

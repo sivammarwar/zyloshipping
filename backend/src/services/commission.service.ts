@@ -71,23 +71,25 @@ export async function calculateCommission(
     });
 
     if (existing) {
-      // Update existing commission
       await prisma.commission.update({
         where: { orderId },
         data: {
-          amount: netCommission,
-          percentage: marginPercent,
-          status: 'PENDING',
+          revenue,
+          supplierCost,
+          gatewayFee,
+          netCommission,
+          marginPercent,
         },
       });
     } else {
-      // Create new commission record
       await prisma.commission.create({
         data: {
           orderId,
-          amount: netCommission,
-          percentage: marginPercent,
-          status: 'PENDING',
+          revenue,
+          supplierCost,
+          gatewayFee,
+          netCommission,
+          marginPercent,
         },
       });
     }
@@ -118,8 +120,8 @@ export async function reverseCommission(orderId: string): Promise<void> {
     await prisma.commission.update({
       where: { orderId },
       data: {
-        amount: 0,
-        status: 'REFUNDED',
+        netCommission: 0,
+        revenue: 0,
       },
     });
 
@@ -138,16 +140,17 @@ export async function getTotalCommission(
 ): Promise<number> {
   const result = await prisma.commission.aggregate({
     where: {
-      createdAt: {
-        gte: startDate,
-        lte: endDate,
+      order: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
       },
-      status: 'PENDING',
     },
     _sum: {
-      amount: true,
+      netCommission: true,
     },
   });
 
-  return result._sum.amount || 0;
+  return result._sum.netCommission || 0;
 }

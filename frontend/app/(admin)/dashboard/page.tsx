@@ -43,6 +43,7 @@ const NAV_ITEMS = [
   { label: 'Products',   href: '/dashboard/products',   icon: '🏷' },
   { label: 'Suppliers',  href: '/dashboard/suppliers',  icon: '🔗' },
   { label: 'Analytics',  href: '/dashboard/analytics',  icon: '📊' },
+  { label: 'Social Media', href: '/dashboard/social-media/accounts', icon: '📱' },
   { label: 'AI Agents',  href: '/dashboard/agents',     icon: '🤖' },
   { label: 'Settings',   href: '/dashboard/settings',   icon: '⚙️' },
 ];
@@ -69,6 +70,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    document.cookie = 'admin_token=; path=/; max-age=0; SameSite=Lax';
     window.location.href = '/login';
   };
 

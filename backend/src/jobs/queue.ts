@@ -9,11 +9,14 @@ import { runHealthMonitorJob } from './healthMonitor.job';
 import { runPricingUpdateJob } from './pricingUpdate.job';
 import { runTrackingPollerJob } from './trackingPoller.job';
 import { runAbandonedCartJob } from './abandonedCart.job';
+import { processScheduledRefunds } from '../services/refund/refundProcessor.service';
 
 const url = process.env.REDIS_URL;
 const connection = url
   ? new IORedis(url, { maxRetriesPerRequest: null })
   : null;
+
+export const redisConnection = connection;
 
 const QUEUE_NAME = 'zylo';
 
@@ -71,6 +74,17 @@ async function processAutomationJob(job: {
         await runAbandonedCartJob(job.data.userId, job.data.cartId);
       }
       break;
+    case 'refundProcessor':
+      await processScheduledRefunds();
+      break;
+    case 'socialMediaAutomation':
+      const { runSocialMediaAutomationJob } = await import('./socialMediaAutomation.job');
+      await runSocialMediaAutomationJob();
+      break;
+    case 'socialMediaAnalytics':
+      const { syncSocialMediaAnalytics } = await import('./socialMediaAutomation.job');
+      await syncSocialMediaAnalytics();
+      break;
     default:
       console.warn('[bullmq] unknown job', job.name);
   }
@@ -88,6 +102,34 @@ export async function registerRepeatJobs(): Promise<void> {
   await q.add('healthMonitor', {}, { repeat: { every: every(5) }, jobId: 'repeat-health' });
   await q.add('pricingUpdate', {}, { repeat: { every: hour }, jobId: 'repeat-pricing' });
   await q.add('trackingPoller', {}, { repeat: { every: 30 * 60 * 1000 }, jobId: 'repeat-tracking-poller' });
+  await q.add('refundProcessor', {}, { repeat: { every: hour }, jobId: 'repeat-refund-processor' });
+  
+  // Social Media Automation - 3x daily at optimal US times (IST)
+  // 5:30 PM IST = 7 AM EST
+  await q.add('socialMediaAutomation', {}, { 
+    repeat: { pattern: '30 17 * * *' }, 
+    jobId: 'repeat-social-media-morning' 
+  });
+  // 10:30 PM IST = 12 PM EST
+  await q.add('socialMediaAutomation', {}, { 
+    repeat: { pattern: '30 22 * * *' }, 
+    jobId: 'repeat-social-media-noon' 
+  });
+  // 4:30 AM IST = 6 PM EST (previous day)
+  await q.add('socialMediaAutomation', {}, { 
+    repeat: { pattern: '30 4 * * *' }, 
+    jobId: 'repeat-social-media-evening' 
+  });
+  
+  // Analytics sync - every 6 hours
+  await q.add('socialMediaAnalytics', {}, { 
+    repeat: { every: 6 * hour }, 
+    jobId: 'repeat-social-media-analytics' 
+  });
+  
+  console.log('[Queue] Refund processor scheduled (runs every hour)');
+  console.log('[Queue] Social media automation scheduled (3x daily at US peak times)');
+  console.log('[Queue] Social media analytics sync scheduled (every 6 hours)');
 }
 
 export function startWorkers() {

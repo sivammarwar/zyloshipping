@@ -24,10 +24,6 @@ export const prisma: PrismaClient =
         url: process.env.DATABASE_URL,
       },
     },
-    // Production-ready connection pooling for high traffic
-    // Scales from free tier to lakhs of users without code changes
-    // Just upgrade your database plan when needed
-    connectionLimit: process.env.NODE_ENV === 'production' ? 100 : 10,
   });
 
 if (process.env.NODE_ENV !== 'production') {

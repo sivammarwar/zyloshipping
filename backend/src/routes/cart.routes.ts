@@ -388,7 +388,11 @@ router.post('/abandoned/:id/send-recovery', authMiddleware, adminMiddleware, asy
     data:  { recoveryStatus: 'email_sent' },
   });
 
-  // TODO: enqueue recovery email job
+  const { getOrderAutomationQueue } = await import('../jobs/queue');
+  const queue = getOrderAutomationQueue();
+  if (queue && snapshot.userId && snapshot.cartId) {
+    await queue.add('abandonedCart', { userId: snapshot.userId, cartId: snapshot.cartId }, { delay: 0 });
+  }
   res.json({ success: true, message: `Recovery email queued for ${snapshot.userEmail}` });
 });
 

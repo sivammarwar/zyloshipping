@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useCompare } from '@/context/CompareContext';
 
 // ── Types ─────────────────────────────────────────────────────
 export interface ProductCardData {
@@ -83,8 +84,11 @@ export default function ProductCard({
   currency = 'USD',
   currencySymbol = '$',
 }: Props) {
-  const [added, setAdded] = useState(false);
-  const [hovered, setHovered] = useState(false);
+  const [added, setAdded]           = useState(false);
+  const [hovered, setHovered]       = useState(false);
+  const [atMax, setAtMax]           = useState(false);
+  const { toggle, isSelected, isAtMax } = useCompare();
+  const selected = isSelected(product.id);
 
   const iconIndex = parseInt(product.id, 10) % 5 || 0;
 
@@ -97,6 +101,17 @@ export default function ProductCard({
     if (added) return;
     setAdded(true);
     setTimeout(() => setAdded(false), 1400);
+  }
+
+  function handleCompare(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!selected && isAtMax) {
+      setAtMax(true);
+      setTimeout(() => setAtMax(false), 1600);
+      return;
+    }
+    toggle(product);
   }
 
   return (
@@ -333,6 +348,45 @@ export default function ProductCard({
             ✓ Free shipping
           </div>
         )}
+
+        {/* Compare toggle */}
+        <button
+          onClick={handleCompare}
+          aria-label={selected ? 'Remove from comparison' : 'Add to comparison'}
+          style={{
+            marginTop: '0.6rem',
+            width: '100%',
+            padding: '0.35rem 0',
+            background: selected ? 'var(--ink)' : 'transparent',
+            border: `1px solid ${selected ? 'var(--ink)' : atMax ? 'var(--red)' : 'var(--border)'}`,
+            borderRadius: 2,
+            cursor: 'pointer',
+            fontSize: '0.68rem',
+            fontWeight: selected ? 500 : 400,
+            letterSpacing: '0.05em',
+            color: selected ? 'var(--white)' : atMax ? 'var(--red)' : 'var(--ink-faint)',
+            fontFamily: 'var(--sans)',
+            transition: 'all 0.18s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.3rem',
+          }}
+        >
+          {atMax ? (
+            'Max 3 reached'
+          ) : selected ? (
+            <>
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="10" height="10"><path d="M2 6h8" /></svg>
+              Remove
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="10" height="10"><path d="M6 2v8M2 6h8" /></svg>
+              Compare
+            </>
+          )}
+        </button>
       </div>
     </Link>
   );

@@ -33,8 +33,21 @@ export default function LoginPage() {
       }
 
       if (data.accessToken) {
+        const maxAge = 60 * 60 * 24 * 7; // 7 days
+
+        // Store in localStorage
         localStorage.setItem('token', data.accessToken);
-        window.location.href = '/dashboard';
+
+        // Set admin_token cookie so middleware protects /dashboard routes
+        document.cookie = `admin_token=${data.accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+        // Also set auth_token cookie so middleware protects store user routes
+        // (covers the case where the same login page is used for both roles)
+        document.cookie = `auth_token=${data.accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+        const params   = new URLSearchParams(window.location.search);
+        const redirect = params.get('redirect') || '/dashboard';
+        window.location.href = redirect;
       } else {
         setError('Login failed. Please try again.');
         setLoading(false);
@@ -249,7 +262,6 @@ export default function LoginPage() {
             ) : 'Sign in →'}
           </button>
 
-          {/* Footer note */}
           <p style={{ marginTop: '1.5rem', fontSize: '0.72rem', color: 'var(--ink-faint)', textAlign: 'center', lineHeight: 1.6 }}>
             By signing in, you agree to our{' '}
             <Link href="/terms" style={{ color: 'var(--ink-muted)', textDecoration: 'underline' }}>Terms</Link>

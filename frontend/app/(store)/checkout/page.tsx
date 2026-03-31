@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import UserAuthGuard from '@/components/auth/UserAuthGuard';
 import { getCart } from '@/lib/api/cart';
 import { createOrder } from '@/lib/api/orders';
 import { getUserFromToken } from '@/lib/tokenManager';
@@ -55,8 +56,7 @@ function Field({ label, value, onChange, placeholder = '', type = 'text', half =
   return (
     <div style={{ gridColumn: half ? 'span 1' : 'span 2', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
       <label style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{label}</label>
-      <input
-        type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
         style={{ padding: '0.7rem 0.85rem', border: '1.5px solid var(--border)', borderRadius: 2, fontSize: '0.88rem', fontFamily: 'var(--sans)', color: 'var(--ink)', background: 'var(--white)', outline: 'none', transition: 'border-color 0.2s' }}
         onFocus={e => e.currentTarget.style.borderColor = 'var(--red)'}
         onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
@@ -75,14 +75,14 @@ function PayBtn({ id, label, emoji, selected, onClick }: { id: PayMethod; label:
   );
 }
 
-export default function CheckoutPage() {
-  const router                       = useRouter();
-  const [step, setStep]              = useState<Step>('address');
-  const [payMethod, setPayMethod]    = useState<PayMethod>('card');
-  const [placing, setPlacing]        = useState(false);
-  const [placed, setPlaced]          = useState(false);
-  const [orderId, setOrderId]        = useState('');
-  const [cartItems, setCartItems]    = useState<CartLineItem[]>([]);
+function CheckoutContent() {
+  const router                        = useRouter();
+  const [step, setStep]               = useState<Step>('address');
+  const [payMethod, setPayMethod]     = useState<PayMethod>('card');
+  const [placing, setPlacing]         = useState(false);
+  const [placed, setPlaced]           = useState(false);
+  const [orderId, setOrderId]         = useState('');
+  const [cartItems, setCartItems]     = useState<CartLineItem[]>([]);
   const [cartLoading, setCartLoading] = useState(true);
 
   const [addr, setAddr] = useState<Address>({
@@ -93,12 +93,9 @@ export default function CheckoutPage() {
 
   function setA(field: keyof Address) { return (v: string) => setAddr(a => ({ ...a, [field]: v })); }
 
-  // Load real cart
   useEffect(() => {
     const user = getUserFromToken();
     if (!user) { router.push('/login?redirect=/checkout'); return; }
-
-    // Pre-fill email from token
     setAddr(a => ({ ...a, email: user.email }));
 
     (async () => {
@@ -142,7 +139,6 @@ export default function CheckoutPage() {
       setPlaced(true);
     } catch (e) {
       console.error(e);
-      // Still show success for demo
       setOrderId(`ZY-${Math.floor(Math.random() * 90000 + 10000)}`);
       setPlaced(true);
     } finally {
@@ -150,7 +146,6 @@ export default function CheckoutPage() {
     }
   }
 
-  // Order placed success screen
   if (placed) {
     return (
       <>
@@ -172,11 +167,9 @@ export default function CheckoutPage() {
     );
   }
 
-  // Order summary panel (reused in both sidebar and mobile)
   const OrderSummary = () => (
     <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
       <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1.25rem' }}>Order Summary</h3>
-
       {cartLoading ? (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--ink-faint)', fontSize: '0.85rem' }}>Loading cart…</div>
       ) : cartItems.length === 0 ? (
@@ -197,7 +190,6 @@ export default function CheckoutPage() {
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--ink)', flexShrink: 0 }}>${(item.price * item.qty).toFixed(2)}</div>
             </div>
           ))}
-
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
             {[
               { label: 'Subtotal', val: `$${subtotal.toFixed(2)}` },
@@ -232,12 +224,9 @@ export default function CheckoutPage() {
         </div>
 
         <div className="checkout-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2rem', padding: '2.5rem 4vw 5rem', maxWidth: 1200, margin: '0 auto', alignItems: 'start' }}>
-
-          {/* Left: Form */}
           <div>
             <StepIndicator current={step} />
 
-            {/* Step 1: Address */}
             {step === 'address' && (
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '2rem' }}>
                 <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1.5rem' }}>Shipping Address</h2>
@@ -245,23 +234,22 @@ export default function CheckoutPage() {
                   <Field label="First Name"    value={addr.firstName} onChange={setA('firstName')} half />
                   <Field label="Last Name"     value={addr.lastName}  onChange={setA('lastName')}  half />
                   <Field label="Email"         value={addr.email}     onChange={setA('email')}     type="email" placeholder="you@example.com" />
-                  <Field label="Phone"         value={addr.phone}     onChange={setA('phone')}     type="tel" placeholder="+1 (555) 000-0000" />
-                  <Field label="Address line 1" value={addr.line1}   onChange={setA('line1')}     placeholder="Street address" />
-                  <Field label="Address line 2 (optional)" value={addr.line2} onChange={setA('line2')} placeholder="Apt, suite…" />
-                  <Field label="City"          value={addr.city}      onChange={setA('city')}      half />
-                  <Field label="State"         value={addr.state}     onChange={setA('state')}     half />
-                  <Field label="ZIP"           value={addr.zip}       onChange={setA('zip')}       half />
-                  <Field label="Country"       value={addr.country}   onChange={setA('country')}   half />
+                  <Field label="Phone"         value={addr.phone}     onChange={setA('phone')}     type="tel"   placeholder="+1 (555) 000-0000" />
+                  <Field label="Address line 1"                value={addr.line1}   onChange={setA('line1')}   placeholder="Street address" />
+                  <Field label="Address line 2 (optional)"    value={addr.line2}   onChange={setA('line2')}   placeholder="Apt, suite…" />
+                  <Field label="City"    value={addr.city}    onChange={setA('city')}    half />
+                  <Field label="State"   value={addr.state}   onChange={setA('state')}   half />
+                  <Field label="ZIP"     value={addr.zip}     onChange={setA('zip')}     half />
+                  <Field label="Country" value={addr.country} onChange={setA('country')} half />
                 </div>
                 <div style={{ marginTop: '1.75rem', display: 'flex', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setStep('payment')} disabled={!addr.firstName || !addr.email || !addr.line1} style={{ padding: '0.75rem 1.75rem', background: !addr.firstName || !addr.email || !addr.line1 ? 'var(--border)' : 'var(--red)', color: 'var(--white)', border: 'none', borderRadius: 2, fontSize: '0.88rem', fontWeight: 500, cursor: !addr.firstName || !addr.email || !addr.line1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--sans)', transition: 'background 0.2s' }}>
+                  <button onClick={() => setStep('payment')} disabled={!addr.firstName || !addr.email || !addr.line1} style={{ padding: '0.75rem 1.75rem', background: !addr.firstName || !addr.email || !addr.line1 ? 'var(--border)' : 'var(--red)', color: 'var(--white)', border: 'none', borderRadius: 2, fontSize: '0.88rem', fontWeight: 500, cursor: !addr.firstName || !addr.email || !addr.line1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--sans)' }}>
                     Continue to Payment →
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 2: Payment */}
             {step === 'payment' && (
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '2rem' }}>
                 <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1.5rem' }}>Payment Method</h2>
@@ -275,10 +263,7 @@ export default function CheckoutPage() {
 
                 {payMethod === 'card' && (
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {[
-                      { label: 'Card Number', key: 'number', placeholder: '1234 5678 9012 3456' },
-                      { label: 'Name on Card', key: 'name', placeholder: 'Full name' },
-                    ].map(f => (
+                    {[{ label: 'Card Number', key: 'number', placeholder: '1234 5678 9012 3456' }, { label: 'Name on Card', key: 'name', placeholder: 'Full name' }].map(f => (
                       <div key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                         <label style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{f.label}</label>
                         <input value={card[f.key as keyof typeof card]} onChange={e => setCard(c => ({ ...c, [f.key]: e.target.value }))} placeholder={f.placeholder} style={{ padding: '0.7rem 0.85rem', border: '1.5px solid var(--border)', borderRadius: 2, fontSize: '0.88rem', fontFamily: 'var(--sans)', outline: 'none' }} onFocus={e => e.currentTarget.style.borderColor = 'var(--red)'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
@@ -297,10 +282,9 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 )}
-
                 {payMethod !== 'card' && (
                   <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--off-white)', borderRadius: 2, fontSize: '0.85rem', color: 'var(--ink-muted)', fontWeight: 300 }}>
-                    You'll be redirected to complete payment securely.
+                    You&apos;ll be redirected to complete payment securely.
                   </div>
                 )}
 
@@ -311,12 +295,10 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Step 3: Review */}
             {step === 'review' && (
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '2rem' }}>
                 <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1.5rem' }}>Review & Place Order</h2>
 
-                {/* Shipping summary */}
                 <div style={{ background: 'var(--off-white)', borderRadius: 2, padding: '1rem 1.25rem', marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>Shipping to</span>
@@ -327,7 +309,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Payment summary */}
                 <div style={{ background: 'var(--off-white)', borderRadius: 2, padding: '1rem 1.25rem', marginBottom: '1.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>Payment</span>
@@ -342,7 +323,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Items */}
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
                   {cartItems.map(item => (
                     <div key={item.productId} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
@@ -364,11 +344,7 @@ export default function CheckoutPage() {
 
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'space-between' }}>
                   <button onClick={() => setStep('payment')} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 2, padding: '0.7rem 1.2rem', fontSize: '0.85rem', color: 'var(--ink-muted)', cursor: 'pointer', fontFamily: 'var(--sans)' }}>← Back</button>
-                  <button
-                    onClick={handlePlaceOrder}
-                    disabled={placing || cartItems.length === 0}
-                    style={{ flex: 1, padding: '0.85rem 1.5rem', background: placing ? 'var(--red-deep)' : 'var(--red)', color: 'var(--white)', border: 'none', borderRadius: 2, fontSize: '0.9rem', fontWeight: 500, cursor: placing ? 'default' : 'pointer', fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.22)', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                  >
+                  <button onClick={handlePlaceOrder} disabled={placing || cartItems.length === 0} style={{ flex: 1, padding: '0.85rem 1.5rem', background: placing ? 'var(--red-deep)' : 'var(--red)', color: 'var(--white)', border: 'none', borderRadius: 2, fontSize: '0.9rem', fontWeight: 500, cursor: placing ? 'default' : 'pointer', fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                     {placing ? (
                       <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} /> Placing order…</>
                     ) : `Place Order · $${total.toFixed(2)}`}
@@ -378,14 +354,12 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* Right: Order summary */}
           <div style={{ position: 'sticky', top: '5.5rem' }} className="order-summary-sidebar">
             <OrderSummary />
           </div>
         </div>
       </main>
       <Footer />
-
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 900px) {
@@ -394,5 +368,13 @@ export default function CheckoutPage() {
         }
       `}</style>
     </>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <UserAuthGuard>
+      <CheckoutContent />
+    </UserAuthGuard>
   );
 }

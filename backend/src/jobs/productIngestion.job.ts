@@ -5,6 +5,7 @@ import { runContentGenerationAgent } from '../agents/contentGeneration.agent';
 import { getAliExpressAdapter } from '../services/supplier/aliexpress.adapter';
 import { getCjAdapter } from '../services/supplier/cj.adapter';
 import { isAliExpressConfigured, warnAliExpressDisabled } from '../utils/supplierConfig';
+import { uploadProductImages } from '../services/storage/r2.service';
 
 async function ingestFromSource(
   raw: { id: string; title: string; price: number; stock: number; rating: number; images: unknown },
@@ -22,7 +23,19 @@ async function ingestFromSource(
 
   const ai = await runContentGenerationAgent({ title: raw.title, description: raw.title });
   const prefix = supplierId === 'cj' ? 'CJ' : 'AE';
-  await prisma.product.create({
+  
+  // Extract image URLs from raw.images
+  let imageUrls: string[] = [];
+  if (Array.isArray(raw.images)) {
+    imageUrls = raw.images;
+  } else if (typeof raw.images === 'object' && raw.images !== null) {
+    imageUrls = Object.values(raw.images).filter((url): url is string => typeof url === 'string');
+  }
+
+  // Upload images to R2 (fallback to original URLs if R2 not configured)
+  const uploadedImages = await uploadProductImages(imageUrls, raw.id);
+  
+  const product = await prisma.product.create({
     data: {
       supplierId,
       supplierSku: raw.id,
@@ -30,7 +43,7 @@ async function ingestFromSource(
       slug,
       title: ai.aiTitle || raw.title,
       description: ai.aiDescription || raw.title,
-      imagesJson: raw.images as object,
+      imagesJson: uploadedImages, // Use R2 URLs
       price: raw.price * 2.5,
       supplierCost: raw.price,
       stockQuantity: raw.stock,
@@ -42,6 +55,8 @@ async function ingestFromSource(
       aiMetaTags: ai.metaTags ?? [],
     },
   });
+
+  console.log(`[Product Ingestion] Created product ${product.sku} with ${uploadedImages.length} images`);
 }
 
 export async function runProductIngestionJob(): Promise<void> {

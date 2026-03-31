@@ -4,6 +4,7 @@ import { TicketStatus } from '@prisma/client';
 import { prisma } from '../db/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { runCustomerSupportAgent } from '../agents/customerSupport.agent';
+import { sendAlertEmail } from '../services/email.service';
 
 const router = Router();
 
@@ -88,8 +89,17 @@ router.post('/chat', authMiddleware, async (req: AuthRequest, res: Response) => 
       
       ticketId = ticket.id;
 
-      // TODO: Send email notification to admin
       console.log(`[Support] Ticket ${ticketNumber} escalated to human support`);
+      setImmediate(async () => {
+        try {
+          await sendAlertEmail(
+            `🎫 New Support Ticket Escalated — ${ticketNumber}`,
+            `Ticket ${ticketNumber} requires human attention.\n\nMessage: ${parsed.data.message}\n${parsed.data.orderId ? `Order ID: ${parsed.data.orderId}` : ''}\n\nView in admin: ${process.env.NEXT_PUBLIC_APP_URL || 'https://zyloshipping.com'}/dashboard/support`
+          );
+        } catch (e) {
+          console.error('[Support] Failed to send admin alert email:', e);
+        }
+      });
     } else {
       // Save conversation to support_tickets for history
       const count = await prisma.supportTicket.count();

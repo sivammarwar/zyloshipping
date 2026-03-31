@@ -749,6 +749,244 @@ enum AgentLogType {
   WARN
 }
 
+enum RefundStatus {
+  PENDING           // Initial state - awaiting AI evaluation
+  APPROVED          // Auto-approved by AI - scheduled for 2 days
+  REJECTED          // Rejected by AI or admin
+  SCHEDULED         // Approved and scheduled for processing
+  PROCESSING        // Currently being processed with payment gateway
+  COMPLETED         // Successfully refunded
+  FAILED            // Refund processing failed
+  MANUAL_REVIEW     // Escalated to admin for manual review
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  TWITTER
+  REDDIT
+}
+
+enum PostType {
+  REEL
+  POST
+  STORY
+  TWEET
+  THREAD
+  REDDIT_POST
+  REDDIT_LINK
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  POSTING
+  PUBLISHED
+  FAILED
+  DELETED
+}
+
+enum ContentStyle {
+  VIRAL_HOOK
+  EDUCATIONAL
+  PROMOTIONAL
+  STORYTELLING
+  TRENDING
+  CONTROVERSIAL
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REFUND REQUESTS
+// ═══════════════════════════════════════════════════════════════
+
+model RefundRequest {
+  id              String        @id @default(cuid())
+  orderId         String        @map("order_id")
+  userId          String        @map("user_id")
+  reason          String        @db.Text
+  amount          Float
+  status          RefundStatus  @default(PENDING)
+  approvalType    String?       @map("approval_type")    // 'AUTO' | 'MANUAL'
+  approvedAt      DateTime?     @map("approved_at")
+  processedAt     DateTime?     @map("processed_at")
+  scheduledFor    DateTime?     @map("scheduled_for")    // 2 working days after approval
+  refundId        String?       @map("refund_id")        // Gateway refund ID
+  gateway         String?                                 // 'razorpay' | 'stripe'
+  rejectionReason String?       @map("rejection_reason")
+  adminNotes      String?       @db.Text @map("admin_notes")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status, scheduledFor])
+  @@map("refund_requests")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SOCIAL MEDIA AUTOMATION
+// ═══════════════════════════════════════════════════════════════
+
+model SocialMediaAccount {
+  id                String          @id @default(cuid())
+  platform          SocialPlatform
+  accountName       String          @map("account_name")
+  accountHandle     String          @map("account_handle")
+  accountId         String?         @map("account_id")        // Platform-specific account ID
+  
+  // Encrypted credentials
+  accessToken       String?         @db.Text @map("access_token")
+  refreshToken      String?         @db.Text @map("refresh_token")
+  tokenExpiresAt    DateTime?       @map("token_expires_at")
+  
+  // Account settings
+  isActive          Boolean         @default(true) @map("is_active")
+  targetRegion      String          @default("US") @map("target_region")  // US, UK, CA, etc.
+  postingTimezone   String          @default("America/New_York") @map("posting_timezone")
+  
+  // Posting schedule (IST times converted to target timezone)
+  postingTimes      Json            @default("[]") @map("posting_times")  // ["06:00", "18:00"]
+  postsPerDay       Int             @default(3) @map("posts_per_day")
+  
+  // Analytics
+  followersCount    Int             @default(0) @map("followers_count")
+  lastSyncedAt      DateTime?       @map("last_synced_at")
+  
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  
+  posts             SocialMediaPost[]
+  campaigns         SocialMediaCampaign[]
+  
+  @@unique([platform, accountHandle])
+  @@index([platform, isActive])
+  @@map("social_media_accounts")
+}
+
+model SocialMediaPost {
+  id                String          @id @default(cuid())
+  accountId         String          @map("account_id")
+  campaignId        String?         @map("campaign_id")
+  
+  platform          SocialPlatform
+  postType          PostType
+  status            PostStatus      @default(DRAFT)
+  
+  // Content
+  caption           String          @db.Text
+  hashtags          String[]        @default([])
+  mediaUrls         Json            @default("[]") @map("media_urls")     // Array of image/video URLs
+  videoUrl          String?         @db.Text @map("video_url")            // For reels/videos
+  thumbnailUrl      String?         @db.Text @map("thumbnail_url")
+  
+  // AI Generation metadata
+  aiPrompt          String?         @db.Text @map("ai_prompt")
+  contentStyle      ContentStyle?   @map("content_style")
+  productIds        String[]        @default([]) @map("product_ids")      // Products featured
+  
+  // Scheduling
+  scheduledFor      DateTime?       @map("scheduled_for")
+  publishedAt       DateTime?       @map("published_at")
+  
+  // Platform response
+  platformPostId    String?         @map("platform_post_id")
+  platformUrl       String?         @db.Text @map("platform_url")
+  errorMessage      String?         @db.Text @map("error_message")
+  
+  // Analytics
+  views             Int             @default(0)
+  likes             Int             @default(0)
+  comments          Int             @default(0)
+  shares            Int             @default(0)
+  saves             Int             @default(0)
+  reach             Int             @default(0)
+  engagement        Float           @default(0)                           // Calculated engagement rate
+  
+  lastAnalyticsSync DateTime?       @map("last_analytics_sync")
+  
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  
+  account           SocialMediaAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign          SocialMediaCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  
+  @@index([accountId, status])
+  @@index([platform, status])
+  @@index([scheduledFor])
+  @@index([campaignId])
+  @@map("social_media_posts")
+}
+
+model SocialMediaCampaign {
+  id                String          @id @default(cuid())
+  accountId         String          @map("account_id")
+  
+  name              String
+  description       String?         @db.Text
+  isActive          Boolean         @default(true) @map("is_active")
+  
+  // Campaign settings
+  targetRegion      String          @default("US") @map("target_region")
+  contentStyle      ContentStyle    @default(VIRAL_HOOK) @map("content_style")
+  postsPerDay       Int             @default(3) @map("posts_per_day")
+  
+  // Product selection
+  autoSelectProducts Boolean        @default(true) @map("auto_select_products")  // Auto-select trending
+  productCount      Int             @default(10) @map("product_count")
+  
+  // Scheduling
+  startDate         DateTime        @map("start_date")
+  endDate           DateTime?       @map("end_date")
+  nextRunAt         DateTime?       @map("next_run_at")
+  
+  // Analytics
+  totalPosts        Int             @default(0) @map("total_posts")
+  totalViews        Int             @default(0) @map("total_views")
+  totalEngagement   Int             @default(0) @map("total_engagement")
+  
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  
+  account           SocialMediaAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  posts             SocialMediaPost[]
+  
+  @@index([accountId, isActive])
+  @@index([nextRunAt])
+  @@map("social_media_campaigns")
+}
+
+model SocialMediaAnalytics {
+  id                String          @id @default(cuid())
+  platform          SocialPlatform
+  date              DateTime        @db.Date
+  
+  // Daily metrics
+  postsPublished    Int             @default(0) @map("posts_published")
+  totalViews        Int             @default(0) @map("total_views")
+  totalLikes        Int             @default(0) @map("total_likes")
+  totalComments     Int             @default(0) @map("total_comments")
+  totalShares       Int             @default(0) @map("total_shares")
+  totalReach        Int             @default(0) @map("total_reach")
+  
+  // Audience metrics
+  followersGained   Int             @default(0) @map("followers_gained")
+  followersLost     Int             @default(0) @map("followers_lost")
+  profileVisits     Int             @default(0) @map("profile_visits")
+  
+  // Engagement
+  engagementRate    Float           @default(0) @map("engagement_rate")
+  
+  // Top performing post
+  topPostId         String?         @map("top_post_id")
+  topPostViews      Int             @default(0) @map("top_post_views")
+  
+  createdAt         DateTime        @default(now()) @map("created_at")
+  
+  @@unique([platform, date])
+  @@index([platform, date])
+  @@map("social_media_analytics")
+}
+
 // ═══════════════════════════════════════════════════════════════
 // PRICING PLANS
 // ═══════════════════════════════════════════════════════════════

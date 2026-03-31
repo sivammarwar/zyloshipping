@@ -12,7 +12,7 @@ import { authMiddleware, AuthRequest, ownerMiddleware } from '../middleware/auth
 import { requireAdmin } from '../middleware/requireAdmin';
 import { requireMFA } from '../middleware/requireMFA';
 import { adminAuthLimiter } from '../middleware/rateLimiter.middleware';
-import { AgentStatus, PipelineStatus, TicketStatus } from '@prisma/client';
+import { AgentStatus, PipelineStatus, TicketStatus, RefundStatus } from '@prisma/client';
 
 import { adminLogin } from '../controllers/admin/authLogin.controller';
 import { setupMfa, verifyMfa } from '../controllers/admin/mfa.controller';
@@ -272,6 +272,159 @@ router.post('/inventory/alerts/:productId/dismiss', async (req: AuthRequest, res
   } catch (error) {
     console.error('[admin] Error dismissing alert:', error);
     res.status(500).json({ error: 'Failed to dismiss alert' });
+  }
+});
+
+// ── Refund Management ──────────────────────────────────────────
+import { processRefundRequest } from '../services/refund/refundProcessor.service';
+import { calculateScheduledDate } from '../services/refund/refundProcessor.service';
+
+router.get('/refunds', async (req: AuthRequest, res: Response) => {
+  try {
+    const { status, page = '1', limit = '20' } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    
+    const validStatus = Object.values(RefundStatus).includes(status as RefundStatus) ? status as RefundStatus : undefined;
+    
+    const refundWhere = validStatus ? { status: validStatus } : undefined;
+    const [refunds, total] = await Promise.all([
+      (prisma.refundRequest.findMany as Function)({
+        where: refundWhere,
+        include: {
+          order: { 
+            select: { 
+              orderNumber: true, 
+              totalAmount: true,
+              user: { select: { name: true, email: true } }
+            } 
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+      }),
+      (prisma.refundRequest.count as Function)(refundWhere ? { where: refundWhere } : {}),
+    ]);
+    
+    res.json({
+      refunds,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error('[admin] Error fetching refunds:', error);
+    res.status(500).json({ error: 'Failed to fetch refunds' });
+  }
+});
+
+router.get('/refunds/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const refund = await (prisma.refundRequest.findUnique as Function)({
+      where: { id: req.params.id },
+      include: {
+        order: {
+          include: {
+            items: { include: { product: true } },
+            payment: true,
+            user: true,
+          },
+        },
+      },
+    });
+    
+    if (!refund) {
+      return res.status(404).json({ error: 'Refund request not found' });
+    }
+    
+    res.json(refund);
+  } catch (error) {
+    console.error('[admin] Error fetching refund:', error);
+    res.status(500).json({ error: 'Failed to fetch refund' });
+  }
+});
+
+router.post('/refunds/:id/approve', async (req: AuthRequest, res: Response) => {
+  try {
+    const { adminNotes } = req.body;
+    
+    const refund = await prisma.refundRequest.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'APPROVED',
+        approvalType: 'MANUAL',
+        approvedAt: new Date(),
+        scheduledFor: calculateScheduledDate(new Date()),
+        adminNotes,
+      },
+    });
+    
+    await prisma.order.update({
+      where: { id: refund.orderId },
+      data: { status: 'REFUND_REQUESTED' },
+    });
+    
+    await logAdminAction(req, {
+      action: 'refund.approve',
+      resource: 'refund',
+      resourceId: req.params.id,
+    });
+    
+    res.json({ success: true, refund });
+  } catch (error) {
+    console.error('[admin] Error approving refund:', error);
+    res.status(500).json({ error: 'Failed to approve refund' });
+  }
+});
+
+router.post('/refunds/:id/reject', async (req: AuthRequest, res: Response) => {
+  try {
+    const { reason, adminNotes } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ error: 'Rejection reason is required' });
+    }
+    
+    const refund = await prisma.refundRequest.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: reason,
+        adminNotes,
+      },
+    });
+    
+    await logAdminAction(req, {
+      action: 'refund.reject',
+      resource: 'refund',
+      resourceId: req.params.id,
+    });
+    
+    res.json({ success: true, refund });
+  } catch (error) {
+    console.error('[admin] Error rejecting refund:', error);
+    res.status(500).json({ error: 'Failed to reject refund' });
+  }
+});
+
+router.post('/refunds/:id/process-now', async (req: AuthRequest, res: Response) => {
+  try {
+    await processRefundRequest(req.params.id);
+    
+    await logAdminAction(req, {
+      action: 'refund.process_immediate',
+      resource: 'refund',
+      resourceId: req.params.id,
+    });
+    
+    res.json({ success: true, message: 'Refund processed successfully' });
+  } catch (error: any) {
+    console.error('[admin] Error processing refund:', error);
+    res.status(500).json({ error: error.message || 'Failed to process refund' });
   }
 });
 

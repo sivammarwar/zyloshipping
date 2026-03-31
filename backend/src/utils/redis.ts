@@ -26,6 +26,7 @@ export const KEYS = {
   /** Admin TOTP session (12h) — refresh tokens re-use this flag */
   adminMfa: (userId: string) => `admin:mfa:${userId}`,
   agentDisabled: (agentName: string) => `agent:disabled:${agentName}`,
+  ADMIN_ALERT_COOLDOWN: 'admin:alert:cooldown',
 };
 
 export const TTL = {

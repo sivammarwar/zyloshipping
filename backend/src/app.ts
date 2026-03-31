@@ -26,6 +26,7 @@ import webhookRoutes from './routes/webhook.routes';
 import adminRoutes from './routes/admin.routes';
 import supportRoutes from './routes/support.routes';
 import reviewRoutes from './routes/reviews.routes';
+import socialMediaRoutes from './routes/socialMedia.routes';
 
 function parseOrigins(): string[] {
   const raw = process.env.CORS_ORIGINS || process.env.NEXT_PUBLIC_APP_URL || '';
@@ -113,6 +114,7 @@ export function createApp(): Express {
   app.use('/api/auth', rateLimitAuth, authRoutes);
   app.use('/api/payments', rateLimitPayment, paymentRoutes);
   app.use('/api/admin', rateLimitAdmin, adminRoutes);
+  app.use('/api/admin/social-media', rateLimitAdmin, socialMediaRoutes);
   app.use('/api/webhooks', webhookRoutes); // No rate limit on webhooks
   
   // General rate limiter for all other routes

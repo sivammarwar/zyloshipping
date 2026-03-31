@@ -6,8 +6,18 @@
 
 import { Redis } from 'ioredis';
 
+// Get Redis URL with proper fallback
+const getRedisUrl = () => {
+  // If UPSTASH_REDIS_REST_URL is set and valid, use it
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_URL !== 'https://your-redis.upstash.io') {
+    return process.env.UPSTASH_REDIS_REST_URL;
+  }
+  // Otherwise use REDIS_URL or default to localhost
+  return process.env.REDIS_URL || 'redis://localhost:6379';
+};
+
 // Initialize Redis client with production-ready configuration
-const redis = new Redis(process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_URL || 'redis://localhost:6379', {
+const redis = new Redis(getRedisUrl(), {
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
   enableOfflineQueue: true,

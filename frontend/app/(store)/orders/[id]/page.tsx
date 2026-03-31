@@ -1,75 +1,165 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-
-// ── Mock order data ───────────────────────────────────────────
-const ORDER = {
-  id: 'ZY-28431',
-  placedAt: 'Saturday, 28 June 2025 · 10:12 AM',
-  status: 'IN_TRANSIT',
-  paymentMethod: 'UPI — Google Pay',
-  paymentId: 'pay_RzpABC123XYZ',
-  gateway: 'Razorpay',
-  subtotal: 178.00,
-  shipping: 0,
-  discount: 0,
-  total: 178.00,
-  estimatedDelivery: 'Thu, 3 Jul – Mon, 7 Jul 2025',
-  shippingAddress: {
-    name: 'Ryan K.',
-    line1: '42 MG Road, Koramangala',
-    line2: '',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    pin: '560034',
-    country: 'India',
-    phone: '+91 98400 00000',
-  },
-  items: [
-    { id: '1', name: 'Noise Cancelling Earbuds Pro', variant: 'Black / One Size', qty: 1, price: 79.00, image: '🎧' },
-    { id: '2', name: 'Smart Wireless Crossbody — Midnight', variant: 'Midnight / Medium', qty: 1, price: 89.00, image: '👜' },
-    { id: '3', name: 'Portable Power Bank 20K', variant: 'White', qty: 0, price: 10.00, image: '🔋' },
-  ],
-  tracking: {
-    carrier: 'AliExpress Standard',
-    number: 'LY123456789CN',
-    url: '#',
-    events: [
-      { date: 'Jun 28 · 10:15 AM', status: 'Order placed',           location: 'Bengaluru, IN',  done: true  },
-      { date: 'Jun 28 · 02:41 PM', status: 'Payment confirmed',      location: '',               done: true  },
-      { date: 'Jun 29 · 08:30 AM', status: 'Submitted to supplier',  location: 'Guangzhou, CN',  done: true  },
-      { date: 'Jun 30 · 11:00 AM', status: 'Shipped by supplier',    location: 'Guangzhou, CN',  done: true  },
-      { date: 'Jul 01 · 06:00 AM', status: 'In transit',             location: 'Shanghai Hub',   done: true  },
-      { date: 'Est. Jul 3–7',      status: 'Out for delivery',        location: 'Bengaluru, IN',  done: false },
-      { date: '',                  status: 'Delivered',               location: '',               done: false },
-    ],
-  },
-};
+import { useRouter } from 'next/navigation';
+import UserAuthGuard from '@/components/auth/UserAuthGuard';
+import { ensureValidToken } from '@/lib/tokenManager';
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  PENDING:           { label: 'Pending',       color: '#6b7280', bg: '#f3f4f6' },
-  PAYMENT_CONFIRMED: { label: 'Paid',          color: '#2563eb', bg: '#eff6ff' },
-  SHIPPED:           { label: 'Shipped',       color: '#2563eb', bg: '#eff6ff' },
-  IN_TRANSIT:        { label: 'In Transit',    color: '#d97706', bg: '#fef3c7' },
-  DELIVERED:         { label: 'Delivered',     color: '#16a34a', bg: '#f0fdf4' },
-  COMPLETED:         { label: 'Completed',     color: '#16a34a', bg: '#f0fdf4' },
-  CANCELLED:         { label: 'Cancelled',     color: '#6b7280', bg: '#f3f4f6' },
-  REFUND_REQUESTED:  { label: 'Refund Req.',   color: '#dc2626', bg: '#fef2f2' },
-  REFUNDED:          { label: 'Refunded',      color: '#9f1239', bg: '#fff1f2' },
+  PENDING:               { label: 'Pending',       color: '#6b7280', bg: '#f3f4f6' },
+  PAYMENT_CONFIRMED:     { label: 'Paid',           color: '#2563eb', bg: '#eff6ff' },
+  SUBMITTED_TO_SUPPLIER: { label: 'Processing',     color: '#d97706', bg: '#fef3c7' },
+  SUPPLIER_CONFIRMED:    { label: 'Confirmed',      color: '#7c3aed', bg: '#f5f3ff' },
+  SHIPPED:               { label: 'Shipped',        color: '#2563eb', bg: '#eff6ff' },
+  IN_TRANSIT:            { label: 'In Transit',     color: '#d97706', bg: '#fef3c7' },
+  OUT_FOR_DELIVERY:      { label: 'Out for Delivery', color: '#16a34a', bg: '#f0fdf4' },
+  DELIVERED:             { label: 'Delivered',      color: '#16a34a', bg: '#f0fdf4' },
+  COMPLETED:             { label: 'Completed',      color: '#16a34a', bg: '#f0fdf4' },
+  CANCELLED:             { label: 'Cancelled',      color: '#6b7280', bg: '#f3f4f6' },
+  REFUND_REQUESTED:      { label: 'Refund Req.',    color: '#dc2626', bg: '#fef2f2' },
+  REFUNDED:              { label: 'Refunded',       color: '#9f1239', bg: '#fff1f2' },
 };
 
-export default function StoreOrderDetailPage({ params }: { params: { id: string } }) {
+const TIMELINE_STEPS = [
+  'PENDING',
+  'PAYMENT_CONFIRMED',
+  'SUBMITTED_TO_SUPPLIER',
+  'SHIPPED',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+];
+
+interface OrderDetail {
+  id: string;
+  orderNumber: string;
+  status: string;
+  createdAt: string;
+  totalAmount: number;
+  subtotal?: number;
+  shippingCost?: number;
+  discount?: number;
+  estimatedDelivery?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
+  paymentMethod?: string;
+  paymentId?: string;
+  gateway?: string;
+  shippingAddress?: {
+    firstName: string; lastName: string;
+    line1: string; line2?: string;
+    city: string; state: string; zip: string;
+    country: string; phone?: string;
+  };
+  items: {
+    id: string;
+    quantity: number;
+    price: number;
+    product: { title: string; images?: string[] };
+  }[];
+  trackingEvents?: {
+    date: string;
+    status: string;
+    location?: string;
+    done: boolean;
+  }[];
+}
+
+function OrderDetailContent({ orderId }: { orderId: string }) {
+  const router = useRouter();
+  const [order, setOrder]       = useState<OrderDetail | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState('');
   const [refundOpen, setRefundOpen] = useState(false);
-  const [refundMsg,  setRefundMsg]  = useState('');
-  const s = STATUS_STYLE[ORDER.status] ?? STATUS_STYLE['PENDING'];
-  const doneCount = ORDER.tracking.events.filter(e => e.done).length;
-  const progressPct = Math.round((doneCount / ORDER.tracking.events.length) * 100);
+  const [refundMsg, setRefundMsg]   = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchOrder = useCallback(async () => {
+    try {
+      const token = await ensureValidToken();
+      if (!token) { router.replace('/login?redirect=/orders'); return; }
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${orderId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.status === 401) { router.replace('/login?redirect=/orders'); return; }
+      if (!res.ok) { setError('Order not found.'); return; }
+      const data = await res.json();
+      setOrder(data.order ?? data);
+    } catch {
+      setError('Failed to load order. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId, router]);
+
+  useEffect(() => {
+    fetchOrder();
+    // Poll every 30 s for live status updates
+    const interval = setInterval(fetchOrder, 30000);
+    return () => clearInterval(interval);
+  }, [fetchOrder]);
+
+  async function handleRefundSubmit() {
+    if (!refundMsg.trim()) return;
+    setSubmitting(true);
+    try {
+      const token = await ensureValidToken();
+      await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${orderId}/refund`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ reason: refundMsg }),
+        }
+      );
+      setRefundOpen(false);
+      setRefundMsg('');
+      fetchOrder();
+    } catch {
+      // silent
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '2px solid var(--red)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+        <p style={{ color: 'var(--ink-muted)', fontSize: '0.9rem' }}>{error || 'Order not found.'}</p>
+        <Link href="/orders" style={{ color: 'var(--red)', fontSize: '0.85rem' }}>← Back to orders</Link>
+      </div>
+    );
+  }
+
+  const s = STATUS_STYLE[order.status] ?? STATUS_STYLE['PENDING'];
+  const currentStep = TIMELINE_STEPS.indexOf(order.status);
+  const events = order.trackingEvents ?? TIMELINE_STEPS.map((step, i) => ({
+    status: STATUS_STYLE[step]?.label ?? step,
+    date: '',
+    done: i <= (currentStep === -1 ? 0 : currentStep),
+    location: '',
+  }));
+  const doneCount = events.filter(e => e.done).length;
+  const progressPct = Math.round((doneCount / events.length) * 100);
+
+  const subtotal = order.subtotal ?? order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const shipping = order.shippingCost ?? 0;
+  const discount = order.discount ?? 0;
 
   return (
     <div style={{ fontFamily: 'var(--sans)', background: 'var(--off-white)', minHeight: '100vh', color: 'var(--ink)' }}>
-
-      {/* Nav */}
       <nav style={{ background: 'var(--white)', borderBottom: '1px solid var(--border)', padding: '0 2rem', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
         <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <div style={{ width: 28, height: 28, background: 'var(--red)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -85,77 +175,88 @@ export default function StoreOrderDetailPage({ params }: { params: { id: string 
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2.5rem 1.5rem', display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
 
-        {/* ── LEFT ── */}
+        {/* LEFT */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-          {/* Header card */}
+          {/* Header */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
               <div>
                 <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.3rem' }}>Order</div>
-                <h1 style={{ fontFamily: 'var(--serif)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.02em', lineHeight: 1 }}>#{ORDER.id}</h1>
-                <div style={{ fontSize: '0.76rem', color: 'var(--ink-faint)', marginTop: '0.35rem' }}>{ORDER.placedAt}</div>
+                <h1 style={{ fontFamily: 'var(--serif)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.02em', lineHeight: 1 }}>#{order.orderNumber}</h1>
+                <div style={{ fontSize: '0.76rem', color: 'var(--ink-faint)', marginTop: '0.35rem' }}>
+                  {new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
               </div>
               <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.3rem 0.75rem', borderRadius: 2, background: s.bg, color: s.color, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap', alignSelf: 'flex-start' }}>{s.label}</span>
             </div>
-
-            {/* Progress bar */}
             <div style={{ marginTop: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--ink-faint)', marginBottom: '0.4rem' }}>
-                <span>Order progress</span>
-                <span>{doneCount}/{ORDER.tracking.events.length} steps</span>
+                <span>Order progress</span><span>{doneCount}/{events.length} steps</span>
               </div>
               <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--red)', borderRadius: 3, transition: 'width 0.8s cubic-bezier(0.22,1,0.36,1)' }} />
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.4rem' }}>
-                Estimated delivery: <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{ORDER.estimatedDelivery}</span>
-              </div>
+              {order.estimatedDelivery && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.4rem' }}>
+                  Estimated delivery: <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{order.estimatedDelivery}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Tracking timeline */}
-          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>Tracking</div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: 'var(--ink-muted)' }}>{ORDER.tracking.number}</span>
-                <a href={ORDER.tracking.url} style={{ fontSize: '0.72rem', color: 'var(--red)', textDecoration: 'none', borderBottom: '1px solid var(--red-mid)' }}>Track ↗</a>
+          {/* Tracking */}
+          {(order.trackingNumber || events.length > 0) && (
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>Tracking</div>
+                {order.trackingNumber && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: 'var(--ink-muted)' }}>{order.trackingNumber}</span>
+                    {order.trackingUrl && (
+                      <a href={order.trackingUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: 'var(--red)', textDecoration: 'none', borderBottom: '1px solid var(--red-mid)' }}>Track ↗</a>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {events.map((ev, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', paddingBottom: i < events.length - 1 ? '1.25rem' : 0 }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--ink-faint)', textAlign: 'right', paddingTop: '0.15rem', lineHeight: 1.4 }}>{ev.date}</div>
+                    <div style={{ borderLeft: i < events.length - 1 ? '1px solid var(--border)' : 'none', paddingLeft: '1.25rem', position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: -5, top: 4, width: 9, height: 9, borderRadius: '50%', background: ev.done ? 'var(--red)' : 'var(--border)', border: `2px solid ${ev.done ? 'var(--red-light)' : 'var(--off-white)'}`, transition: 'background 0.3s' }} />
+                      <div style={{ fontWeight: ev.done ? 500 : 300, color: ev.done ? 'var(--ink)' : 'var(--ink-faint)', fontSize: '0.84rem' }}>{ev.status}</div>
+                      {ev.location && <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.1rem' }}>{ev.location}</div>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {ORDER.tracking.events.map((ev, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', paddingBottom: i < ORDER.tracking.events.length - 1 ? '1.25rem' : 0 }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--ink-faint)', textAlign: 'right', paddingTop: '0.15rem', lineHeight: 1.4 }}>{ev.date}</div>
-                  <div style={{ borderLeft: i < ORDER.tracking.events.length - 1 ? '1px solid var(--border)' : 'none', paddingLeft: '1.25rem', position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: -5, top: 4, width: 9, height: 9, borderRadius: '50%', background: ev.done ? 'var(--red)' : 'var(--border)', border: `2px solid ${ev.done ? 'var(--red-light)' : 'var(--off-white)'}`, transition: 'background 0.3s' }} />
-                    <div style={{ fontWeight: ev.done ? 500 : 300, color: ev.done ? 'var(--ink)' : 'var(--ink-faint)', fontSize: '0.84rem' }}>{ev.status}</div>
-                    {ev.location && <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.1rem' }}>{ev.location}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Items */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
             <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '1.25rem' }}>Items ordered</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {ORDER.items.map((item, i) => (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {order.items.map((item, i) => (
                 <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 0', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ width: 52, height: 52, background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>{item.image}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, color: 'var(--ink)', fontSize: '0.88rem' }}>{item.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.15rem' }}>{item.variant} · Qty {item.qty}</div>
+                  <div style={{ width: 52, height: 52, background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0, overflow: 'hidden' }}>
+                    {item.product.images?.[0]
+                      ? <img src={item.product.images[0]} alt={item.product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : '📦'}
                   </div>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--red)', fontSize: '0.95rem' }}>${item.price.toFixed(2)}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500, color: 'var(--ink)', fontSize: '0.88rem' }}>{item.product.title}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.15rem' }}>Qty {item.quantity}</div>
+                  </div>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--red)', fontSize: '0.95rem' }}>${(item.price * item.quantity).toFixed(2)}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Refund request */}
-          {ORDER.status !== 'CANCELLED' && ORDER.status !== 'REFUNDED' && (
+          {/* Refund */}
+          {order.status !== 'CANCELLED' && order.status !== 'REFUNDED' && order.status !== 'REFUND_REQUESTED' && (
             <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
               <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.75rem' }}>Help & Returns</div>
               {!refundOpen ? (
@@ -169,7 +270,9 @@ export default function StoreOrderDetailPage({ params }: { params: { id: string 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <textarea value={refundMsg} onChange={e => setRefundMsg(e.target.value)} placeholder="Describe the issue with your order…" rows={3} style={{ border: '1px solid var(--border)', borderRadius: 2, padding: '0.65rem 0.75rem', fontSize: '0.82rem', fontFamily: 'var(--sans)', outline: 'none', resize: 'vertical' }} onFocus={e => e.currentTarget.style.borderColor = 'var(--red)'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
                   <div style={{ display: 'flex', gap: '0.6rem' }}>
-                    <button style={{ padding: '0.5rem 1.1rem', background: 'var(--red)', color: 'white', border: 'none', borderRadius: 2, fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--sans)' }}>Submit request</button>
+                    <button onClick={handleRefundSubmit} disabled={submitting || !refundMsg.trim()} style={{ padding: '0.5rem 1.1rem', background: 'var(--red)', color: 'white', border: 'none', borderRadius: 2, fontSize: '0.8rem', fontWeight: 500, cursor: submitting ? 'default' : 'pointer', fontFamily: 'var(--sans)', opacity: submitting ? 0.7 : 1 }}>
+                      {submitting ? 'Submitting…' : 'Submit request'}
+                    </button>
                     <button onClick={() => setRefundOpen(false)} style={{ padding: '0.5rem 0.85rem', background: 'none', border: '1px solid var(--border)', borderRadius: 2, fontSize: '0.8rem', color: 'var(--ink-muted)', cursor: 'pointer', fontFamily: 'var(--sans)' }}>Cancel</button>
                   </div>
                 </div>
@@ -178,16 +281,14 @@ export default function StoreOrderDetailPage({ params }: { params: { id: string 
           )}
         </div>
 
-        {/* ── RIGHT SIDEBAR ── */}
+        {/* RIGHT SIDEBAR */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-          {/* Order summary */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem' }}>
             <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Order summary</div>
             {[
-              { label: 'Subtotal',  val: `$${ORDER.subtotal.toFixed(2)}` },
-              { label: 'Shipping',  val: ORDER.shipping === 0 ? 'Free' : `$${ORDER.shipping.toFixed(2)}` },
-              { label: 'Discount',  val: ORDER.discount === 0 ? '—' : `-$${ORDER.discount.toFixed(2)}` },
+              { label: 'Subtotal',  val: `$${subtotal.toFixed(2)}` },
+              { label: 'Shipping',  val: shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}` },
+              { label: 'Discount',  val: discount === 0 ? '—' : `-$${discount.toFixed(2)}` },
             ].map(row => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.55rem' }}>
                 <span style={{ color: 'var(--ink-faint)' }}>{row.label}</span>
@@ -196,34 +297,31 @@ export default function StoreOrderDetailPage({ params }: { params: { id: string 
             ))}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 600, color: 'var(--ink)', fontSize: '0.9rem' }}>Total</span>
-              <span style={{ fontFamily: 'var(--serif)', fontWeight: 900, color: 'var(--red)', fontSize: '1.1rem' }}>${ORDER.total.toFixed(2)}</span>
+              <span style={{ fontFamily: 'var(--serif)', fontWeight: 900, color: 'var(--red)', fontSize: '1.1rem' }}>${order.totalAmount.toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Payment */}
-          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem' }}>
-            <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Payment</div>
-            <div style={{ fontSize: '0.84rem', fontWeight: 500, color: 'var(--ink)', marginBottom: '0.25rem' }}>{ORDER.paymentMethod}</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)' }}>via {ORDER.gateway}</div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'monospace', color: 'var(--ink-faint)', marginTop: '0.4rem', wordBreak: 'break-all' }}>{ORDER.paymentId}</div>
-          </div>
-
-          {/* Shipping address */}
-          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem' }}>
-            <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Shipping to</div>
-            <div style={{ fontSize: '0.84rem', fontWeight: 500, color: 'var(--ink)', marginBottom: '0.2rem' }}>{ORDER.shippingAddress.name}</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', lineHeight: 1.65, fontWeight: 300 }}>
-              {ORDER.shippingAddress.line1}<br />
-              {ORDER.shippingAddress.city}, {ORDER.shippingAddress.state} — {ORDER.shippingAddress.pin}<br />
-              {ORDER.shippingAddress.country}<br />
-              {ORDER.shippingAddress.phone}
+          {(order.paymentMethod || order.gateway) && (
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Payment</div>
+              {order.paymentMethod && <div style={{ fontSize: '0.84rem', fontWeight: 500, color: 'var(--ink)', marginBottom: '0.25rem' }}>{order.paymentMethod}</div>}
+              {order.gateway && <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)' }}>via {order.gateway}</div>}
+              {order.paymentId && <div style={{ fontSize: '0.68rem', fontFamily: 'monospace', color: 'var(--ink-faint)', marginTop: '0.4rem', wordBreak: 'break-all' }}>{order.paymentId}</div>}
             </div>
-          </div>
+          )}
 
-          {/* Download invoice */}
-          <button style={{ width: '100%', padding: '0.65rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 2, fontSize: '0.82rem', color: 'var(--ink-muted)', cursor: 'pointer', fontFamily: 'var(--sans)', fontWeight: 400, transition: 'border-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--red)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-            ↓ Download invoice
-          </button>
+          {order.shippingAddress && (
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Shipping to</div>
+              <div style={{ fontSize: '0.84rem', fontWeight: 500, color: 'var(--ink)', marginBottom: '0.2rem' }}>{order.shippingAddress.firstName} {order.shippingAddress.lastName}</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', lineHeight: 1.65, fontWeight: 300 }}>
+                {order.shippingAddress.line1}{order.shippingAddress.line2 && `, ${order.shippingAddress.line2}`}<br />
+                {order.shippingAddress.city}, {order.shippingAddress.state} — {order.shippingAddress.zip}<br />
+                {order.shippingAddress.country}
+                {order.shippingAddress.phone && <><br />{order.shippingAddress.phone}</>}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -233,5 +331,13 @@ export default function StoreOrderDetailPage({ params }: { params: { id: string 
         }
       `}</style>
     </div>
+  );
+}
+
+export default function StoreOrderDetailPage({ params }: { params: { id: string } }) {
+  return (
+    <UserAuthGuard>
+      <OrderDetailContent orderId={params.id} />
+    </UserAuthGuard>
   );
 }

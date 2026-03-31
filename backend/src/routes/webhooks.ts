@@ -7,6 +7,8 @@ import { decrementStockForOrder, restoreStockForOrder } from '../services/order/
 import { trackOrderSales } from '../services/analytics/productMetrics.service';
 import { invalidateRevenueCache } from '../services/analytics/revenue.service';
 import { getOrderAutomationQueue } from '../jobs/queue';
+import { sendOrderConfirmationEmail } from '../services/email/orderConfirmation';
+import { sendPaymentFailedEmail, sendRefundConfirmationEmail } from '../services/email.service';
 
 const router = Router();
 
@@ -78,8 +80,46 @@ async function processPaymentSuccess(orderId: string, gateway: 'razorpay' | 'str
     // 5. Invalidate revenue cache
     await invalidateRevenueCache();
 
-    // 6. Send order confirmation email (TODO: when RESEND_API_KEY is set)
-    // await sendOrderConfirmationEmail(orderId);
+    // 6. Send order confirmation email
+    setImmediate(async () => {
+      try {
+        const order = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: {
+            user: true,
+            items: { include: { product: { select: { title: true } } } },
+          },
+        });
+        if (order && order.user) {
+          const addr = (order.shippingAddressJson ?? {}) as Record<string, string>;
+          const itemsTotal = order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+          await sendOrderConfirmationEmail({
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            customerName: order.user.name || order.user.email,
+            customerEmail: order.user.email,
+            items: order.items.map(i => ({
+              productTitle: i.product?.title || 'Product',
+              quantity: i.quantity,
+              price: Number(i.unitPrice),
+            })),
+            subtotal: itemsTotal,
+            shipping: Number(order.shippingAmount ?? 0),
+            total: Number(order.totalAmount),
+            shippingAddress: {
+              name: addr.name || order.user.name || '',
+              address: addr.address || addr.line1 || '',
+              city: addr.city || '',
+              state: addr.state || '',
+              pincode: addr.pincode || addr.zip || '',
+              phone: addr.phone || order.user.phone || '',
+            },
+          });
+        }
+      } catch (e) {
+        console.error('[webhook] order confirmation email failed:', e);
+      }
+    });
 
     // 7. Queue order submission to supplier
     const queue = getOrderAutomationQueue();
@@ -103,8 +143,23 @@ async function processPaymentFailure(orderId: string): Promise<void> {
       data: { status: OrderStatus.CANCELLED },
     });
 
-    // TODO: Send payment failure email when RESEND_API_KEY is set
-    // await sendPaymentFailureEmail(orderId);
+    setImmediate(async () => {
+      try {
+        const order = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: { user: true },
+        });
+        if (order && order.user) {
+          await sendPaymentFailedEmail(
+            order.user.email,
+            order.orderNumber,
+            'Your payment could not be completed. Please retry or use a different payment method.'
+          );
+        }
+      } catch (e) {
+        console.error('[webhook] payment failure email failed:', e);
+      }
+    });
 
     console.log(`[webhook] Payment failure processed for order ${orderId}`);
   } catch (error) {
@@ -132,8 +187,25 @@ async function processRefund(orderId: string): Promise<void> {
     // 4. Invalidate revenue cache
     await invalidateRevenueCache();
 
-    // 5. Send refund confirmation email (TODO: when RESEND_API_KEY is set)
-    // await sendRefundConfirmationEmail(orderId);
+    // 5. Send refund confirmation email
+    setImmediate(async () => {
+      try {
+        const order = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: { user: true },
+        });
+        if (order && order.user) {
+          await sendRefundConfirmationEmail(
+            order.user.email,
+            order.orderNumber,
+            Number(order.totalAmount),
+            'USD'
+          );
+        }
+      } catch (e) {
+        console.error('[webhook] refund confirmation email failed:', e);
+      }
+    });
 
     console.log(`[webhook] Refund processed for order ${orderId}`);
   } catch (error) {

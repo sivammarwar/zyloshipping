@@ -98,3 +98,110 @@ export async function getCustomerAnalyticsBundle(opts: { periodStart?: Date; per
     })),
   };
 }
+
+/**
+ * Update customer metrics after order completion
+ */
+export async function updateCustomerMetrics(userId: string, orderId: string): Promise<void> {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { totalAmount: true, status: true },
+    });
+
+    if (!order || order.status === 'CANCELLED' || order.status === 'REFUNDED') {
+      return;
+    }
+
+    // Calculate customer lifetime value and order count
+    const stats = await prisma.order.aggregate({
+      where: {
+        userId,
+        status: { notIn: ['CANCELLED', 'REFUNDED'] },
+      },
+      _sum: { totalAmount: true },
+      _count: { id: true },
+    });
+
+    console.log(`[Customer Metrics] Updated for user ${userId}: ${stats._count.id} orders, ₹${stats._sum.totalAmount || 0} LTV`);
+  } catch (error) {
+    console.error('[Customer Metrics] Update failed:', error);
+  }
+}
+
+/**
+ * Get top customers by spend
+ */
+export async function getTopCustomers(limit: number = 25): Promise<Array<{
+  userId: string;
+  email: string;
+  name: string | null;
+  spend: number;
+  orders: number;
+}>> {
+  const topCustomers = await prisma.$queryRaw<{ user_id: string; email: string; name: string | null; spend: number; orders: bigint }[]>`
+    SELECT u.id AS user_id, u.email, u.name,
+      COALESCE(SUM(o.total_amount) FILTER (WHERE o.status NOT IN ('CANCELLED', 'REFUNDED')), 0)::float AS spend,
+      COUNT(o.id)::bigint AS orders
+    FROM users u
+    INNER JOIN orders o ON o.user_id = u.id
+    WHERE u.role = 'CUSTOMER'
+    GROUP BY u.id, u.email, u.name
+    ORDER BY spend DESC
+    LIMIT ${limit}
+  `;
+
+  return topCustomers.map(r => ({
+    userId: r.user_id,
+    email: r.email,
+    name: r.name,
+    spend: r.spend,
+    orders: Number(r.orders),
+  }));
+}
+
+/**
+ * Get customer stats for a specific user
+ */
+export async function getCustomerStats(userId: string): Promise<{
+  totalOrders: number;
+  totalSpend: number;
+  averageOrderValue: number;
+  firstOrderDate: Date | null;
+  lastOrderDate: Date | null;
+  lifetimeValue: number;
+}> {
+  const [stats, firstOrder, lastOrder] = await Promise.all([
+    prisma.order.aggregate({
+      where: {
+        userId,
+        status: { notIn: ['CANCELLED', 'REFUNDED'] },
+      },
+      _sum: { totalAmount: true },
+      _count: { id: true },
+    }),
+    prisma.order.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    }),
+    prisma.order.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const totalSpend = stats._sum.totalAmount || 0;
+  const totalOrders = stats._count.id;
+  const averageOrderValue = totalOrders > 0 ? totalSpend / totalOrders : 0;
+
+  return {
+    totalOrders,
+    totalSpend,
+    averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+    firstOrderDate: firstOrder?.createdAt || null,
+    lastOrderDate: lastOrder?.createdAt || null,
+    lifetimeValue: totalSpend,
+  };
+}

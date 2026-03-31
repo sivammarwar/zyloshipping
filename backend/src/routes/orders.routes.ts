@@ -245,26 +245,48 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req: AuthReq
 });
 
 router.post('/:id/refund', authMiddleware, async (req: AuthRequest, res: Response) => {
+  const { reason } = req.body;
+  
+  if (!reason || reason.trim().length < 10) {
+    return res.status(400).json({ 
+      error: 'Please provide a detailed reason for the refund (minimum 10 characters)' 
+    });
+  }
+
   if (!isOrderNumber(req.params.id)) {
     return res.status(404).json({ error: 'Order not found' });
   }
+  
   const order = await prisma.order.findFirst({
     where: { orderNumber: req.params.id },
   });
 
-  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
 
   const isAdmin = ['ADMIN', 'OWNER'].includes(req.user!.role);
   if (!isAdmin && order.userId !== req.user!.id) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const updated = await prisma.order.update({
-    where: { id: order.id },
-    data: { status: OrderStatus.REFUND_REQUESTED },
-  });
-
-  res.json({ order: updated });
+  try {
+    const { processRefundRequest } = await import('../agents/refundDispute.agent');
+    const result = await processRefundRequest(order.id, req.user!.id, reason);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+    
+    res.json({
+      success: true,
+      message: result.message,
+      refundRequestId: result.refundRequestId,
+    });
+  } catch (error: any) {
+    console.error('[Orders] Refund request failed:', error);
+    res.status(500).json({ error: 'Failed to process refund request' });
+  }
 });
 
 router.post('/bulk', authMiddleware, adminMiddleware, async (req: AuthRequest, res: Response) => {

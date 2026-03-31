@@ -27,6 +27,8 @@ export async function indexProduct(productId: string) {
     slug: p.slug,
     rating: p.rating,
     totalSales: p.totalSales,
+    inStock: p.stockQuantity > 0,
+    stockQuantity: p.stockQuantity,
   };
   await c.initIndex(indexName).saveObject(object);
   await prisma.product.update({
@@ -56,4 +58,73 @@ export async function searchProducts(
     hitsPerPage: opts?.hitsPerPage ?? 20,
   });
   return res;
+}
+
+export async function configureSearchRanking() {
+  const c = client();
+  if (!c) {
+    console.warn('[Algolia] Client not configured, skipping search ranking setup');
+    return;
+  }
+
+  try {
+    const index = c.initIndex(indexName);
+    await index.setSettings({
+      searchableAttributes: [
+        'title',
+        'category',
+      ],
+      attributesForFaceting: [
+        'category',
+        'inStock',
+      ],
+      customRanking: [
+        'desc(rating)',
+        'desc(totalSales)',
+        'desc(inStock)',
+      ],
+      ranking: [
+        'typo',
+        'geo',
+        'words',
+        'filters',
+        'proximity',
+        'attribute',
+        'exact',
+        'custom',
+      ],
+    });
+    console.log('[Algolia] Search ranking configured successfully');
+  } catch (error) {
+    console.error('[Algolia] Failed to configure search ranking:', error);
+  }
+}
+
+export async function bulkIndexProducts(productIds: string[]) {
+  const c = client();
+  if (!c) return;
+
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: productIds },
+      status: { in: [ProductStatus.ACTIVE, ProductStatus.LOW] },
+    },
+  });
+
+  const objects = products.map(p => ({
+    objectID: p.id,
+    title: p.title,
+    category: p.category,
+    price: p.price,
+    slug: p.slug,
+    rating: p.rating,
+    totalSales: p.totalSales,
+    inStock: p.stockQuantity > 0,
+    stockQuantity: p.stockQuantity,
+  }));
+
+  if (objects.length > 0) {
+    await c.initIndex(indexName).saveObjects(objects);
+    console.log(`[Algolia] Bulk indexed ${objects.length} products`);
+  }
 }
