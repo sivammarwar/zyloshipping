@@ -287,7 +287,7 @@ router.post('/admin/checkout', authMiddleware, adminMiddleware, validate(adminCh
   const settings = await prisma.storeSettings.findUnique({ where: { id: 'singleton' } });
   const shippingAmount = subtotal > (settings?.freeShippingThreshold ?? 200) ? 0 : (settings?.defaultShippingRate ?? 9.99);
   let discountAmount = 0;
-  if (couponCode && settings?.activeCouponCode === couponCode) {
+  if (couponCode && settings?.activeCouponCode === couponCode && settings?.couponDiscountPct != null) {
     discountAmount = subtotal * (settings.couponDiscountPct / 100);
   }
 

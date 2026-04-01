@@ -85,7 +85,7 @@ async function createOrderHandler(req: AuthRequest, res: Response) {
   const { items, shippingAddress, couponCode, note, isAdminOrder } = req.body;
 
   const products = await prisma.product.findMany({
-    where: { id: { in: items.map(i => i.productId) } },
+    where: { id: { in: items.map((i: { productId: string }) => i.productId) } },
     include: { supplier: true },
   });
 
@@ -101,13 +101,13 @@ async function createOrderHandler(req: AuthRequest, res: Response) {
   }
 
   const settings = await prisma.storeSettings.findUnique({ where: { id: 'singleton' } });
-  const subtotal = items.reduce((sum, item) => {
+  const subtotal = items.reduce((sum: number, item: { productId: string; quantity: number }) => {
     const product = products.find(p => p.id === item.productId)!;
     return sum + product.price * item.quantity;
   }, 0);
 
   let discountAmount = 0;
-  if (couponCode && settings?.activeCouponCode === couponCode) {
+  if (couponCode && settings?.activeCouponCode === couponCode && settings?.couponDiscountPct != null) {
     discountAmount = subtotal * (settings.couponDiscountPct / 100);
   }
 
@@ -132,7 +132,7 @@ async function createOrderHandler(req: AuthRequest, res: Response) {
       note,
       isAdminOrder: isAdminOrder ?? false,
       items: {
-        create: items.map(item => {
+        create: items.map((item: { productId: string; quantity: number }) => {
           const product = products.find(p => p.id === item.productId)!;
           return {
             productId: product.id,
