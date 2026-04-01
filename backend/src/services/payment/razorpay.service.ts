@@ -1,6 +1,9 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
-import { toPaise } from '@zyloshipping/shared/utils/currency';
+
+// Inline from shared package (avoiding monorepo import issues)
+const toPaise = (inr: number) => Math.round(inr * 100);
+
 import { prisma } from '../../db/prisma';
 import { paymentLogger } from '../../utils/logger';
 

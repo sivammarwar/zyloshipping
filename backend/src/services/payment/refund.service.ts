@@ -1,7 +1,10 @@
 import { OrderStatus, TicketStatus } from '@prisma/client';
 import crypto from 'crypto';
 import { prisma } from '../../db/prisma';
-import { toPaise } from '@zyloshipping/shared/utils/currency';
+
+// Inline from shared package (avoiding monorepo import issues)
+const toPaise = (inr: number) => Math.round(inr * 100);
+
 import { refundRazorpayPayment } from './razorpay.service';
 import { refundStripePaymentIntent } from './stripe.service';
 import { reverseCommissionLedger } from './commission.service';
