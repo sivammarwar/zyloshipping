@@ -2,7 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Metadata } from 'next';
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -62,12 +63,11 @@ const CATEGORY_META: Record<string, { title: string; description: string; h1: st
   },
 };
 
-async function fetchCategoryProducts(category: string) {
+interface Product { id: string; slug: string; name: string; title?: string; category: string; price: number; originalPrice: number; rating: number; badge?: string; imageUrl?: string; storefront?: { imageUrl?: string } }
+
+async function fetchCategoryProducts(category: string): Promise<Product[]> {
   try {
-    const label = category.replace(/-/g, ' ');
-    const res = await fetch(`${API_BASE}/api/products?category=${encodeURIComponent(label)}&limit=12`, {
-      next: { revalidate: 1800 },
-    });
+    const res = await fetch(`${API_BASE}/api/products?category=${encodeURIComponent(category)}&limit=24`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
     return data.products || [];
@@ -76,40 +76,42 @@ async function fetchCategoryProducts(category: string) {
   }
 }
 
-export async function generateStaticParams() {
-  return Object.keys(CATEGORY_META).map((slug) => ({ slug }));
-}
+export default function CategoryPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
+  const meta = CATEGORY_META[slug];
+  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const meta = CATEGORY_META[params.slug];
-  if (!meta) return { title: 'Category | ZyloShipping' };
-  return {
-    title: meta.title,
-    description: meta.description,
-    keywords: meta.keywords,
-    openGraph: { title: meta.title, description: meta.description, url: `${BASE_URL}/category/${params.slug}`, type: 'website' },
-    alternates: { canonical: `${BASE_URL}/category/${params.slug}` },
-  };
-}
+  useEffect(() => {
+    if (!meta) return;
+    fetchCategoryProducts(slug).then((data) => {
+      setProducts(data);
+      setLoading(false);
+    });
+  }, [slug, meta]);
 
-interface Product { id: string; slug: string; name: string; title?: string; category: string; price: number; originalPrice: number; rating: number; badge?: string; imageUrl?: string; storefront?: { imageUrl?: string } }
-
-export default async function CategoryPage({ params }: { params: { slug: string } }) {
-  const meta = CATEGORY_META[params.slug];
-  if (!meta) return <div style={{ padding: '5rem', textAlign: 'center', fontFamily: 'var(--sans)' }}>Category not found.</div>;
-
-  const products: Product[] = await fetchCategoryProducts(params.slug);
+  if (!meta) {
+    return (
+      <>
+        <Header />
+        <div style={{ padding: '5rem', textAlign: 'center', fontFamily: 'var(--sans)' }}>Category not found.</div>
+        <Footer />
+      </>
+    );
+  }
 
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: meta.h1,
     description: meta.description,
-    url: `${BASE_URL}/category/${params.slug}`,
+    url: `${BASE_URL}/category/${slug}`,
     provider: { '@type': 'Organization', name: 'ZyloShipping' },
   };
 
-  const relatedCategories = Object.keys(CATEGORY_META).filter(s => s !== params.slug).slice(0, 5);
+  const relatedCategories = Object.keys(CATEGORY_META).filter(s => s !== slug).slice(0, 5);
 
   return (
     <>
@@ -140,7 +142,11 @@ export default async function CategoryPage({ params }: { params: { slug: string 
         {/* Products Grid */}
         <section style={{ padding: '2.5rem 4vw 4rem' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-            {products.length > 0 ? (
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--ink-faint)', fontSize: '0.9rem' }}>
+                <p>Loading products…</p>
+              </div>
+            ) : products.length > 0 ? (
               <>
                 <div style={{ fontSize: '0.8rem', color: 'var(--ink-faint)', marginBottom: '1.5rem' }}>
                   {products.length} products found
@@ -186,7 +192,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--ink-faint)', fontSize: '0.9rem' }}>
-                <p style={{ marginBottom: '1rem' }}>Products are being loaded…</p>
+                <p style={{ marginBottom: '1rem' }}>No products found in this category.</p>
                 <Link href="/products" style={{ color: 'var(--red)', textDecoration: 'none' }}>Browse all products →</Link>
               </div>
             )}
@@ -198,12 +204,12 @@ export default async function CategoryPage({ params }: { params: { slug: string 
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             <h2 style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Browse Other Categories</h2>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {relatedCategories.map(slug => (
-                <Link key={slug} href={`/category/${slug}`} style={{ padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: 2, textDecoration: 'none', fontSize: '0.82rem', color: 'var(--ink-muted)', transition: 'all 0.15s', textTransform: 'capitalize' }}
+              {relatedCategories.map(cat => (
+                <Link key={cat} href={`/category/${cat}`} style={{ padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: 2, textDecoration: 'none', fontSize: '0.82rem', color: 'var(--ink-muted)', transition: 'all 0.15s', textTransform: 'capitalize' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--red)'; (e.currentTarget as HTMLElement).style.color = 'var(--red)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink-muted)'; }}
                 >
-                  {CATEGORY_META[slug]?.h1 || slug}
+                  {CATEGORY_META[cat]?.h1 || cat}
                 </Link>
               ))}
             </div>

@@ -2,26 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Metadata } from 'next';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { BLOG_POSTS } from '@/lib/blog-posts';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://zyloshipping.com';
-
-export const metadata: Metadata = {
-  title: 'Blog — E-Commerce Tips, Dropshipping & US Market Trends | ZyloShipping',
-  description: 'Expert guides on dropshipping, side hustles, and the best products to sell in the USA. Updated weekly with real market data.',
-  keywords: ['dropshipping blog', 'ecommerce tips USA', 'side hustle guide', 'trending products 2026'],
-  openGraph: {
-    title: 'ZyloShipping Blog — E-Commerce Tips for the US Market',
-    description: 'Expert guides on dropshipping, side hustles, and the best products to sell in the USA.',
-    url: `${BASE_URL}/blog`,
-    type: 'website',
-  },
-  alternates: { canonical: `${BASE_URL}/blog` },
-};
 
 const CATEGORY_COLORS: Record<string, string> = {
   Business: 'var(--red)',
