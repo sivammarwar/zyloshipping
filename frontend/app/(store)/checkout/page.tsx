@@ -101,7 +101,7 @@ function CheckoutContent() {
     (async () => {
       try {
         const res = await getCart();
-        const items = (res.cart?.items || []).map(item => ({
+        const items = (res.cart?.items || []).map((item: any) => ({
           productId: item.product.id,
           name:      item.product.title,
           price:     item.product.price,
