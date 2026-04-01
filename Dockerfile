@@ -30,6 +30,8 @@ COPY --from=build /app/backend/dist ./dist
 COPY --from=build /app/backend/package.json ./package.json
 COPY --from=build /app/backend/prisma ./prisma
 COPY --from=build /app/shared ./shared
+# Copy shared package to node_modules so Node can resolve @zyloshipping/shared
+RUN mkdir -p node_modules/@zyloshipping && cp -r shared node_modules/@zyloshipping/
 WORKDIR /app
 RUN npx prisma generate
 EXPOSE 4000
