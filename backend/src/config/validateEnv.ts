@@ -6,8 +6,6 @@
 const REQUIRED_ALWAYS = [
   'DATABASE_URL',
   'DIRECT_URL',
-  'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
   'UPSTASH_REDIS_REST_URL',
   'UPSTASH_REDIS_REST_TOKEN',
   'JWT_SECRET',
@@ -32,6 +30,8 @@ const OPTIONAL_WARN = [
   'ALIEXPRESS_APP_KEY',
   'ALIEXPRESS_APP_SECRET',
   'AFTERSHIP_API_KEY',
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
 ] as const;
 
 const WEBHOOK_SECRETS_PROD = ['STRIPE_WEBHOOK_SECRET', 'RAZORPAY_WEBHOOK_SECRET'] as const;
@@ -55,6 +55,10 @@ function applyAliases(): void {
   if (!missing('SUPABASE_SERVICE_ROLE_KEY') && missing('SUPABASE_SERVICE_KEY')) {
     process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   }
+}
+
+function hasSupabaseServiceKey(): boolean {
+  return !missing('SUPABASE_SERVICE_KEY') || !missing('SUPABASE_SERVICE_ROLE_KEY');
 }
 
 function hasCjToken(): boolean {
@@ -85,7 +89,7 @@ export function validateEnv(): void {
     }
   }
 
-  if (missing('SUPABASE_SERVICE_KEY') && missing('SUPABASE_SERVICE_ROLE_KEY')) {
+  if (missing('SUPABASE_SERVICE_KEY') && missing('SUPABASE_SERVICE_ROLE_KEY') && !missing('SUPABASE_URL')) {
     errors.push('Missing SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY for Supabase admin API)');
   }
 
