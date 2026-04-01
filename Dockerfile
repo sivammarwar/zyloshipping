@@ -26,6 +26,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/backend/dist ./dist
 COPY --from=build /app/backend/package.json ./package.json
 COPY --from=build /app/backend/prisma ./prisma
+COPY --from=build /app/shared ./shared
 WORKDIR /app
 RUN npx prisma generate
 EXPOSE 4000
