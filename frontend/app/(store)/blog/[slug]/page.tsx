@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Metadata, ResolvingMetadata } from 'next';
+import { useParams } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
@@ -10,34 +10,6 @@ import Footer from '@/components/layout/Footer';
 import { BLOG_POSTS, getPostBySlug } from '@/lib/blog-posts';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://zyloshipping.com';
-
-export async function generateStaticParams() {
-  return BLOG_POSTS.map((p) => ({ slug: p.slug }));
-}
-
-export async function generateMetadata(
-  { params }: { params: { slug: string } },
-  _parent: ResolvingMetadata
-): Promise<Metadata> {
-  const post = getPostBySlug(params.slug);
-  if (!post) return { title: 'Post Not Found | ZyloShipping' };
-
-  return {
-    title: `${post.title} | ZyloShipping Blog`,
-    description: post.excerpt,
-    keywords: post.keywords,
-    openGraph: {
-      title: post.title,
-      description: post.excerpt,
-      url: `${BASE_URL}/blog/${post.slug}`,
-      type: 'article',
-      publishedTime: post.publishedAt,
-      authors: [post.author],
-    },
-    twitter: { card: 'summary_large_image', title: post.title, description: post.excerpt },
-    alternates: { canonical: `${BASE_URL}/blog/${post.slug}` },
-  };
-}
 
 function renderContent(content: string) {
   const lines = content.split('\n');
@@ -100,8 +72,10 @@ function renderContent(content: string) {
   return elements;
 }
 
-export default function BlogPostPage({ params }: { params: { slug: string } }) {
-  const post = getPostBySlug(params.slug);
+export default function BlogPostPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
+  const post = getPostBySlug(slug);
   if (!post) notFound();
 
   const jsonLd = {
