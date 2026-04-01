@@ -99,10 +99,10 @@ function OrderCard({ order }: { order: OrderSummary }) {
           {/* Items */}
           <div style={{ marginBottom: '1.25rem' }}>
             <div style={{ fontSize: '0.7rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.75rem' }}>Items</div>
-            {order.items?.map(item => (
-              <div key={item.id ?? item.product?.title} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.83rem' }}>
+            {order.items?.map((item, idx) => (
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.83rem' }}>
                 <span style={{ color: 'var(--ink-muted)', fontWeight: 300 }}>{item.product?.title} × {item.quantity}</span>
-                <span style={{ color: 'var(--ink)', fontWeight: 500 }}>${((item.price ?? 0) * item.quantity).toFixed(2)}</span>
+                <span style={{ color: 'var(--ink)', fontWeight: 500 }}>${((item as any).price ?? 0 * item.quantity).toFixed(2)}</span>
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', fontWeight: 700 }}>
