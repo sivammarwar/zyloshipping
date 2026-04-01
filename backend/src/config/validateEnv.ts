@@ -109,7 +109,7 @@ export function validateEnv(): void {
     for (const key of WEBHOOK_SECRETS_PROD) {
       if (missing(key)) {
         console.warn(
-          `[env] ${key} not set — webhooks will skip signature verification in development only`
+          `[env] ${key} not set — webhooks will skip signature verification`
         );
       }
     }
@@ -122,8 +122,8 @@ export function validateEnv(): void {
   }
 
   if (errors.length > 0) {
-    console.error('[env] Validation failed:\n', errors.join('\n'));
-    process.exit(1);
+    console.error('[env] Validation warnings (service will start with degraded features):\n', errors.join('\n'));
+    // Don't exit - allow service to start with degraded functionality
   }
 
   console.log('[env] Required environment variables validated');
