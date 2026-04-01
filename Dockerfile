@@ -1,4 +1,5 @@
 # Build from monorepo root: docker build -t zyloshipping-api .
+# Cache-bust: 2025-04-02-02-14
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
