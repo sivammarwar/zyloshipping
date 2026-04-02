@@ -13,7 +13,9 @@ declare global {
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
-  console.error('[prisma] DATABASE_URL not set!');
+  console.error('[prisma] CRITICAL: DATABASE_URL not set!');
+} else {
+  console.log('[prisma] DATABASE_URL configured (length:', DATABASE_URL.length, ')');
 }
 
 export const prisma: PrismaClient =
@@ -25,9 +27,13 @@ export const prisma: PrismaClient =
   });
 
 // Connection pool management for Railway (prevents ECONNRESET)
-prisma.$connect().catch((err) => {
-  console.error('[prisma] Initial connection failed:', err);
-});
+console.log('[prisma] Connecting to database...');
+prisma.$connect()
+  .then(() => console.log('[prisma] Database connected successfully'))
+  .catch((err) => {
+    console.error('[prisma] Initial connection failed:', err.message);
+    console.error('[prisma] Error code:', err.code);
+  });
 
 // Handle process signals for clean shutdown
 process.on('SIGTERM', async () => {
