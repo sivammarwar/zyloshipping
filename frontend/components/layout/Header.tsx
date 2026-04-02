@@ -174,10 +174,10 @@ export default function Header() {
           </Link>
         </li>
 
-        {/* CTA */}
+        {/* CTA - Goes to User Dashboard */}
         <li>
           <Link
-            href="/register"
+            href="/dashboard"
             style={{
               background: 'var(--red)', color: 'var(--white)',
               padding: '0.5rem 1.2rem', borderRadius: 2,
@@ -269,7 +269,7 @@ export default function Header() {
           </Link>
 
           <Link
-            href="/register"
+            href="/dashboard"
             onClick={() => setMenuOpen(false)}
             style={{
               background: 'var(--red)', color: 'var(--white)',

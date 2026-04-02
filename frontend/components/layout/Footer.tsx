@@ -11,7 +11,7 @@ const FOOTER_LINKS = {
     { label: 'My Account', href: '/profile' },
   ],
   Sellers: [
-    { label: 'Start Selling', href: '/register' },
+    { label: 'Start Selling', href: '/dashboard' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'Supplier Network', href: '/suppliers' },
     { label: 'AI Pricing Tool', href: '/tools/pricing' },
