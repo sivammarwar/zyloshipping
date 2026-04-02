@@ -32,18 +32,18 @@ export default function LoginPage() {
         return;
       }
 
-      if (data.accessToken) {
+      if (data.token) {
         const maxAge = 60 * 60 * 24 * 7; // 7 days
 
         // Store in localStorage
-        localStorage.setItem('token', data.accessToken);
+        localStorage.setItem('token', data.token);
 
         // Set admin_token cookie so middleware protects /dashboard routes
-        document.cookie = `admin_token=${data.accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
+        document.cookie = `admin_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         // Also set auth_token cookie so middleware protects store user routes
         // (covers the case where the same login page is used for both roles)
-        document.cookie = `auth_token=${data.accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
+        document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         const params   = new URLSearchParams(window.location.search);
         const redirect = params.get('redirect') || '/dashboard';
