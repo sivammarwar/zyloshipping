@@ -17,9 +17,9 @@ COPY backend ./backend
 # Install from root (npm workspaces hoists deps)
 RUN npm ci
 
-# Generate Prisma, run migrations, and build
+# Generate Prisma and build (no migrations - env vars not available)
 WORKDIR /app/backend
-RUN npx prisma generate && npx prisma migrate deploy && npm run build
+RUN npx prisma generate && npm run build
 
-# Start (with migrations)
+# Start (with migrations - DATABASE_URL available at runtime)
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
