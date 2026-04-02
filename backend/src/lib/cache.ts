@@ -8,33 +8,34 @@ import { Redis } from 'ioredis';
 
 // Get Redis URL with proper fallback
 const getRedisUrl = () => {
-  // If UPSTASH_REDIS_REST_URL is set and valid, use it
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_URL !== 'https://your-redis.upstash.io') {
-    return process.env.UPSTASH_REDIS_REST_URL;
+  // Check for standard Redis URL first
+  if (process.env.REDIS_URL && process.env.REDIS_URL.startsWith('redis')) {
+    return process.env.REDIS_URL;
   }
-  // Otherwise use REDIS_URL or default to localhost
-  return process.env.REDIS_URL || 'redis://localhost:6379';
+  // Skip Upstash REST URL - it uses HTTPS and won't work with ioredis
+  // Return null to disable Redis (app works without caching)
+  return null;
 };
 
-// Initialize Redis client with production-ready configuration
-const redis = new Redis(getRedisUrl(), {
+const redisUrl = getRedisUrl();
+
+// Initialize Redis only if valid URL provided
+const redis = redisUrl ? new Redis(redisUrl, {
   maxRetriesPerRequest: 3,
-  enableReadyCheck: true,
+  enableReadyCheck: false,
   enableOfflineQueue: true,
-  // Connection pooling for high concurrency
-  lazyConnect: false,
-  // Automatic reconnection
+  lazyConnect: true,
   retryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
-});
+}) : null;
 
-redis.on('error', (err) => {
+redis?.on('error', (err) => {
   console.error('Redis connection error:', err);
 });
 
-redis.on('connect', () => {
+redis?.on('connect', () => {
   console.log('✓ Redis connected');
 });
 
@@ -47,6 +48,7 @@ export const cache = {
    * Get cached value
    */
   async get<T>(key: string): Promise<T | null> {
+    if (!redis) return null;
     try {
       const value = await redis.get(key);
       return value ? JSON.parse(value) : null;
@@ -60,6 +62,7 @@ export const cache = {
    * Set cached value with TTL
    */
   async set(key: string, value: any, ttl: number = 300): Promise<void> {
+    if (!redis) return;
     try {
       await redis.setex(key, ttl, JSON.stringify(value));
     } catch (error) {
@@ -71,6 +74,7 @@ export const cache = {
    * Delete cached value
    */
   async del(key: string): Promise<void> {
+    if (!redis) return;
     try {
       await redis.del(key);
     } catch (error) {
@@ -82,6 +86,7 @@ export const cache = {
    * Delete multiple keys by pattern
    */
   async delPattern(pattern: string): Promise<void> {
+    if (!redis) return;
     try {
       const keys = await redis.keys(pattern);
       if (keys.length > 0) {
@@ -96,6 +101,7 @@ export const cache = {
    * Check if key exists
    */
   async exists(key: string): Promise<boolean> {
+    if (!redis) return false;
     try {
       const result = await redis.exists(key);
       return result === 1;
@@ -109,6 +115,7 @@ export const cache = {
    * Increment counter (for rate limiting, analytics)
    */
   async incr(key: string, ttl?: number): Promise<number> {
+    if (!redis) return 0;
     try {
       const value = await redis.incr(key);
       if (ttl && value === 1) {
