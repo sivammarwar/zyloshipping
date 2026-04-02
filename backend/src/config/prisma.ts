@@ -10,9 +10,22 @@ declare global {
 }
 
 /**
- * Uses DATABASE_URL from env. For Supabase + PgBouncer, append
- * ?pgbouncer=true&connection_limit=1 (direct writes use DIRECT_URL in prisma migrate).
+ * Uses DATABASE_URL from env. Railway PostgreSQL requires SSL.
  */
+const getDatabaseUrl = () => {
+  const url = process.env.DATABASE_URL;
+  if (!url) return undefined;
+  
+  // Railway PostgreSQL requires SSL
+  if (url.includes('railway.app') || process.env.RAILWAY_ENVIRONMENT) {
+    // Append sslmode=require if not already present
+    if (!url.includes('sslmode=')) {
+      return url.includes('?') ? `${url}&sslmode=require` : `${url}?sslmode=require`;
+    }
+  }
+  return url;
+};
+
 export const prisma: PrismaClient =
   global.__prisma ??
   new PrismaClient({
@@ -21,7 +34,7 @@ export const prisma: PrismaClient =
       : ['error'],
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: getDatabaseUrl(),
       },
     },
   });
