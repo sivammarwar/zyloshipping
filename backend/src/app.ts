@@ -28,7 +28,14 @@ import supportRoutes from './routes/support.routes';
 import reviewRoutes from './routes/reviews.routes';
 import socialMediaRoutes from './routes/socialMedia.routes';
 
-function parseOrigins(): string[] {
+// Patterns that are always allowed regardless of env vars
+const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
+  /^https:\/\/[\w-]+\.vercel\.app$/,   // any vercel.app subdomain
+  /^http:\/\/localhost:\d+$/,           // localhost any port
+  /^http:\/\/127\.0\.0\.1:\d+$/,       // 127.0.0.1 any port
+];
+
+function parseExplicitOrigins(): string[] {
   const raw = [
     process.env.CORS_ORIGINS,
     process.env.FRONTEND_URL,
@@ -37,15 +44,18 @@ function parseOrigins(): string[] {
     .filter(Boolean)
     .join(',');
 
-  const list = raw
+  return raw
     .split(',')
-    .map(s => s.trim().replace(/\/$/, '')) // strip trailing slashes
+    .map(s => s.trim().replace(/\/$/, ''))
     .filter(Boolean);
+}
 
-  const defaults = ['http://localhost:3000', 'http://127.0.0.1:3000'];
-  const origins = [...new Set([...list, ...defaults])];
-  console.log('[cors] allowedOrigins:', origins);
-  return origins;
+function isOriginAllowed(origin: string): boolean {
+  // Check explicit list first
+  const explicit = parseExplicitOrigins();
+  if (explicit.includes(origin)) return true;
+  // Check patterns
+  return ALLOWED_ORIGIN_PATTERNS.some(pattern => pattern.test(origin));
 }
 
 export function createApp(): Express {
@@ -55,17 +65,12 @@ export function createApp(): Express {
 
   app.use(requestIdMiddleware);
 
-  const allowedOrigins = parseOrigins();
-
   const cspDirectives = {
     defaultSrc: ["'self'"],
     styleSrc: ["'self'", "'unsafe-inline'"],
     scriptSrc: ["'self'"],
     imgSrc: ["'self'", 'data:', 'https:'],
-    connectSrc: [
-      "'self'",
-      ...(allowedOrigins.filter(o => o.startsWith('http'))),
-    ].filter(Boolean),
+    connectSrc: ["'self'", 'https://*.vercel.app'],
   };
 
   app.use(
@@ -75,10 +80,10 @@ export function createApp(): Express {
     })
   );
 
-  // Handle OPTIONS preflight explicitly before cors middleware
+  // Handle OPTIONS preflight explicitly — must be before cors() middleware
   app.options('*', (req: Request, res: Response) => {
-    const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
+    const origin = req.headers.origin || '';
+    if (isOriginAllowed(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
@@ -91,9 +96,9 @@ export function createApp(): Express {
   app.use(
     cors({
       origin(origin, callback) {
-        // Allow requests with no origin (server-to-server, curl, mobile)
+        // Allow requests with no origin (server-to-server, curl, mobile apps)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (isOriginAllowed(origin)) return callback(null, true);
         console.warn('[cors] Blocked origin:', origin);
         return callback(new Error(`CORS: origin ${origin} not allowed`));
       },
