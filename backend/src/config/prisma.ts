@@ -9,22 +9,12 @@ declare global {
   var __prisma: PrismaClient | undefined;
 }
 
-/**
- * Uses DATABASE_URL from env. Railway PostgreSQL requires SSL.
- */
-const getDatabaseUrl = () => {
-  const url = process.env.DATABASE_URL;
-  if (!url) return undefined;
-  
-  // Railway PostgreSQL requires SSL
-  if (url.includes('railway.app') || process.env.RAILWAY_ENVIRONMENT) {
-    // Use sslmode=require for Railway PostgreSQL
-    if (!url.includes('sslmode=')) {
-      return url.includes('?') ? `${url}&sslmode=require` : `${url}?sslmode=require`;
-    }
-  }
-  return url;
-};
+// Use DATABASE_URL as provided by Railway (already includes SSL if needed)
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('[prisma] DATABASE_URL not set!');
+}
 
 export const prisma: PrismaClient =
   global.__prisma ??
@@ -32,11 +22,6 @@ export const prisma: PrismaClient =
     log: process.env.NODE_ENV === 'development'
       ? ['query', 'error', 'warn']
       : ['error'],
-    datasources: {
-      db: {
-        url: getDatabaseUrl(),
-      },
-    },
   });
 
 // Connection pool management for Railway (prevents ECONNRESET)
