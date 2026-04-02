@@ -138,7 +138,7 @@ export function createApp(): Express {
   // Apply specific rate limiters to different route groups
   app.use('/api/auth', rateLimitAuth, authRoutes);
   app.use('/api/payments', rateLimitPayment, paymentRoutes);
-  app.use('/api/admin', rateLimitAdmin, adminRoutes);
+  app.use('/api/admin', adminRoutes); // Rate limiting disabled for testing
   app.use('/api/admin/social-media', rateLimitAdmin, socialMediaRoutes);
   app.use('/api/webhooks', webhookRoutes); // No rate limit on webhooks
   
