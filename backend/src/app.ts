@@ -29,13 +29,23 @@ import reviewRoutes from './routes/reviews.routes';
 import socialMediaRoutes from './routes/socialMedia.routes';
 
 function parseOrigins(): string[] {
-  const raw = process.env.CORS_ORIGINS || process.env.NEXT_PUBLIC_APP_URL || '';
+  const raw = [
+    process.env.CORS_ORIGINS,
+    process.env.FRONTEND_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ]
+    .filter(Boolean)
+    .join(',');
+
   const list = raw
     .split(',')
-    .map(s => s.trim())
+    .map(s => s.trim().replace(/\/$/, '')) // strip trailing slashes
     .filter(Boolean);
+
   const defaults = ['http://localhost:3000', 'http://127.0.0.1:3000'];
-  return [...new Set([...list, ...defaults])];
+  const origins = [...new Set([...list, ...defaults])];
+  console.log('[cors] allowedOrigins:', origins);
+  return origins;
 }
 
 export function createApp(): Express {
@@ -45,6 +55,8 @@ export function createApp(): Express {
 
   app.use(requestIdMiddleware);
 
+  const allowedOrigins = parseOrigins();
+
   const cspDirectives = {
     defaultSrc: ["'self'"],
     styleSrc: ["'self'", "'unsafe-inline'"],
@@ -52,7 +64,7 @@ export function createApp(): Express {
     imgSrc: ["'self'", 'data:', 'https:'],
     connectSrc: [
       "'self'",
-      ...(parseOrigins().filter(o => o.startsWith('http'))),
+      ...(allowedOrigins.filter(o => o.startsWith('http'))),
     ].filter(Boolean),
   };
 
@@ -63,14 +75,27 @@ export function createApp(): Express {
     })
   );
 
-  const allowedOrigins = parseOrigins();
+  // Handle OPTIONS preflight explicitly before cors middleware
+  app.options('*', (req: Request, res: Response) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Request-Id,X-Admin,Cookie');
+      res.setHeader('Access-Control-Max-Age', '86400');
+    }
+    res.sendStatus(204);
+  });
 
   app.use(
     cors({
       origin(origin, callback) {
+        // Allow requests with no origin (server-to-server, curl, mobile)
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(null, false);
+        console.warn('[cors] Blocked origin:', origin);
+        return callback(new Error(`CORS: origin ${origin} not allowed`));
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
