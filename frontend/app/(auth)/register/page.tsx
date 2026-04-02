@@ -5,6 +5,22 @@ import Link from 'next/link';
 
 type Step = 1 | 2;
 
+// InputField component - defined outside RegisterPage to avoid focus loss
+const InputField = ({ label, value, onChange, type = 'text', placeholder = '', children }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; children?: React.ReactNode }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      <label style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{label}</label>
+      <div style={{ position: 'relative' }}>
+        <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          style={{ width: '100%', padding: '0.75rem 0.9rem', border: `1.5px solid ${focused ? 'var(--red)' : 'var(--border)'}`, borderRadius: 2, fontSize: '0.88rem', fontFamily: 'var(--sans)', color: 'var(--ink)', background: 'var(--white)', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box', paddingRight: children ? '2.75rem' : '0.9rem' }} />
+        {children && <div style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)' }}>{children}</div>}
+      </div>
+    </div>
+  );
+};
+
 export default function RegisterPage() {
   const [step, setStep]           = useState<Step>(1);
   const [loading, setLoading]     = useState(false);
@@ -52,21 +68,6 @@ export default function RegisterPage() {
     setLoading(true);
     setTimeout(() => { setLoading(false); setDone(true); }, 1800);
   }
-
-  const InputField = ({ label, value, onChange, type = 'text', placeholder = '', children }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; children?: React.ReactNode }) => {
-    const [focused, setFocused] = useState(false);
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        <label style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{label}</label>
-        <div style={{ position: 'relative' }}>
-          <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-            style={{ width: '100%', padding: '0.75rem 0.9rem', border: `1.5px solid ${focused ? 'var(--red)' : 'var(--border)'}`, borderRadius: 2, fontSize: '0.88rem', fontFamily: 'var(--sans)', color: 'var(--ink)', background: 'var(--white)', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box', paddingRight: children ? '2.75rem' : '0.9rem' }} />
-          {children && <div style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)' }}>{children}</div>}
-        </div>
-      </div>
-    );
-  };
 
   // ── Done screen ───────────────────────────────────────────
   if (done) {
