@@ -14,6 +14,27 @@ interface StoreSettings {
   couponDiscountPct: number;
 }
 
+interface DashboardStats {
+  revenueToday: number;
+  ordersToday: number;
+  avgOrderValue: number;
+  deliverySuccessRate: number;
+  totalRevenue: number;
+  totalOrders: number;
+  totalUsers: number;
+  totalProducts: number;
+}
+
+interface SocialAccount {
+  id: string;
+  platform: 'INSTAGRAM' | 'FACEBOOK' | 'TWITTER' | 'REDDIT';
+  accountName: string;
+  accountHandle: string;
+  isActive: boolean;
+  postsPerDay: number;
+  followersCount: number;
+}
+
 export default function FounderAdminPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -26,6 +47,8 @@ export default function FounderAdminPage() {
     activeCouponCode: '',
     couponDiscountPct: 10,
   });
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
 
   // Check founder auth
   useEffect(() => {
@@ -37,8 +60,9 @@ export default function FounderAdminPage() {
       return;
     }
     
-    // Load settings from backend
     fetchSettings();
+    fetchDashboardData();
+    fetchSocialAccounts();
   }, []);
 
   async function fetchSettings() {
@@ -46,10 +70,40 @@ export default function FounderAdminPage() {
       const res = await fetch('/api/admin/settings');
       if (res.ok) {
         const data = await res.json();
-        setSettings(prev => ({ ...prev, ...data }));
+        setSettings(prev => ({ ...prev, ...data.settings }));
       }
     } catch (err) {
       console.error('Failed to load settings:', err);
+    }
+  }
+
+  async function fetchDashboardData() {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/dashboard/stats', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard:', err);
+    }
+  }
+
+  async function fetchSocialAccounts() {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/social-media/accounts', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSocialAccounts(data.accounts || []);
+      }
+    } catch (err) {
+      console.error('Failed to load social accounts:', err);
     }
   }
 
@@ -79,9 +133,10 @@ export default function FounderAdminPage() {
     window.location.href = '/adminsiva/login';
   }
 
-  const Card = ({ title, children, color = 'var(--white)' }: any) => (
+  const Card = ({ title, children, color = 'var(--white)', subtitle = '' }: any) => (
     <div style={{ background: color, border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
-      <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '1rem' }}>{title}</h3>
+      <h3 style={{ fontFamily: 'var(--serif)', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>{title}</h3>
+      {subtitle && <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '0.25rem' }}>{subtitle}</div>}
       {children}
     </div>
   );
@@ -131,23 +186,27 @@ export default function FounderAdminPage() {
       {/* Tabs */}
       <div style={{ background: 'var(--white)', borderBottom: '1px solid var(--border)', padding: '0 2rem' }}>
         <div style={{ display: 'flex', gap: '2rem' }}>
-          {['overview', 'store', 'pricing', 'system'].map((tab) => (
+          {[
+            { id: 'earnings', label: '💰 Earnings' },
+            { id: 'social', label: '📱 Social Media' },
+            { id: 'store', label: '🏪 Store' },
+            { id: 'system', label: '⚙️ System' },
+          ].map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
               style={{
                 padding: '1rem 0',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: `2px solid ${activeTab === tab ? 'var(--red)' : 'transparent'}`,
-                color: activeTab === tab ? 'var(--red)' : 'var(--ink-muted)',
+                borderBottom: `2px solid ${activeTab === tab.id ? 'var(--red)' : 'transparent'}`,
+                color: activeTab === tab.id ? 'var(--red)' : 'var(--ink-muted)',
                 cursor: 'pointer',
                 fontSize: '0.85rem',
                 fontWeight: 500,
-                textTransform: 'capitalize',
               }}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -156,42 +215,140 @@ export default function FounderAdminPage() {
       {/* Content */}
       <div style={{ padding: '2rem', maxWidth: 1200, margin: '0 auto' }}>
         
-        {/* OVERVIEW TAB */}
-        {activeTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
-            <Card title="📊 Total Revenue" color="#fef3c7">
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--ink)' }}>₹0.00</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--ink-faint)' }}>Lifetime revenue</div>
-            </Card>
-            <Card title="🛒 Total Orders" color="#dbeafe">
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--ink)' }}>0</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--ink-faint)' }}>All time orders</div>
-            </Card>
-            <Card title="👥 Total Users" color="#dcfce7">
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--ink)' }}>0</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--ink-faint)' }}>Registered customers</div>
-            </Card>
-            <Card title="🏪 Active Stores" color="#fce7f3">
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--ink)' }}>1</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--ink-faint)' }}>Store instances</div>
-            </Card>
+        {/* EARNINGS TAB */}
+        {activeTab === 'earnings' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <Card title="Today's Revenue" subtitle={`${settings.currency === 'INR' ? '₹' : '$'}${stats?.revenueToday?.toFixed(2) ?? '0.00'}`} color="#fef3c7" />
+              <Card title="Today's Orders" subtitle={stats?.ordersToday ?? '0'} color="#dbeafe" />
+              <Card title="Total Revenue" subtitle={`${settings.currency === 'INR' ? '₹' : '$'}${stats?.totalRevenue?.toFixed(2) ?? '0.00'}`} color="#dcfce7" />
+              <Card title="Total Orders" subtitle={stats?.totalOrders ?? '0'} color="#fce7f3" />
+            </div>
 
-            <div style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
-              <Card title="⚡ Quick Actions">
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <Link href="/dashboard" style={{ padding: '0.75rem 1.5rem', background: 'var(--red)', color: 'white', borderRadius: 4, textDecoration: 'none', fontSize: '0.85rem' }}>
-                    🏪 Go to Store Dashboard
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+              <Card title="Avg Order Value" subtitle={`${settings.currency === 'INR' ? '₹' : '$'}${stats?.avgOrderValue?.toFixed(2) ?? '0.00'}`} />
+              <Card title="Delivery Success" subtitle={`${stats?.deliverySuccessRate?.toFixed(1) ?? '0.0'}%`} />
+              <Card title="Total Users" subtitle={stats?.totalUsers ?? '0'} />
+            </div>
+
+            <Card title="⚡ Quick Actions">
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <Link href="/dashboard" style={{ padding: '0.75rem 1.5rem', background: 'var(--red)', color: 'white', borderRadius: 4, textDecoration: 'none', fontSize: '0.85rem' }}>
+                  🏪 Store Dashboard
+                </Link>
+                <button onClick={() => setActiveTab('store')} style={{ padding: '0.75rem 1.5rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
+                  ⚙️ Store Settings
+                </button>
+                <button onClick={() => setActiveTab('social')} style={{ padding: '0.75rem 1.5rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
+                  � Social Media
+                </button>
+              </div>
+            </Card>
+          </>
+        )}
+
+        {/* SOCIAL MEDIA TAB */}
+        {activeTab === 'social' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.3rem', color: 'var(--ink)' }}>📱 Social Media Auto-Posting</h2>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Link href="/adminsiva/social/accounts" style={{ padding: '0.75rem 1.5rem', background: 'var(--red)', color: 'white', borderRadius: 4, textDecoration: 'none', fontSize: '0.85rem' }}>
+                  + Connect Account
+                </Link>
+              </div>
+            </div>
+
+            {socialAccounts.length === 0 ? (
+              <Card>
+                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📱</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', color: 'var(--ink)', marginBottom: '0.5rem' }}>No Social Accounts Connected</h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Connect Instagram, Facebook, Twitter to auto-post products</p>
+                  <Link href="/adminsiva/social/accounts" style={{ padding: '0.6rem 1.2rem', background: 'var(--red)', color: 'white', borderRadius: 4, textDecoration: 'none', fontSize: '0.8rem' }}>
+                    + Connect First Account
                   </Link>
-                  <button onClick={() => setActiveTab('store')} style={{ padding: '0.75rem 1.5rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
-                    ⚙️ Edit Store Settings
-                  </button>
-                  <button onClick={() => setActiveTab('pricing')} style={{ padding: '0.75rem 1.5rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
-                    💰 Pricing Rules
-                  </button>
                 </div>
               </Card>
-            </div>
-          </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+                {socialAccounts.map((account) => (
+                  <div key={account.id} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>
+                        {account.platform === 'INSTAGRAM' && '📸'}
+                        {account.platform === 'FACEBOOK' && '📘'}
+                        {account.platform === 'TWITTER' && '🐦'}
+                        {account.platform === 'REDDIT' && '🔴'}
+                      </span>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--ink)' }}>@{account.accountHandle}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--ink-faint)' }}>{account.accountName}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <div style={{ background: 'var(--off-white)', padding: '0.5rem', borderRadius: 4, textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--ink-faint)' }}>Followers</div>
+                        <div style={{ fontWeight: 600 }}>{account.followersCount?.toLocaleString() ?? 0}</div>
+                      </div>
+                      <div style={{ background: 'var(--off-white)', padding: '0.5rem', borderRadius: 4, textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--ink-faint)' }}>Posts/Day</div>
+                        <div style={{ fontWeight: 600 }}>{account.postsPerDay}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        onClick={() => {
+                          const token = localStorage.getItem('token');
+                          fetch(`/api/admin/social-media/accounts/${account.id}`, { 
+                            method: 'PUT', 
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                            body: JSON.stringify({ isActive: !account.isActive }) 
+                          }).then(() => fetchSocialAccounts());
+                        }}
+                        style={{ flex: 1, padding: '0.5rem', background: account.isActive ? '#fee2e2' : '#dcfce7', color: account.isActive ? '#991b1b' : '#166534', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}
+                      >
+                        {account.isActive ? '⏸ Pause' : '▶ Resume'}
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (confirm('Disconnect this account?')) {
+                            const token = localStorage.getItem('token');
+                            fetch(`/api/admin/social-media/accounts/${account.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }).then(() => fetchSocialAccounts());
+                          }
+                        }}
+                        style={{ padding: '0.5rem 0.75rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {socialAccounts.length > 0 && (
+              <Card title="🤖 Auto-Post Settings" style={{ marginTop: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Default Posts Per Day</label>
+                    <input type="number" defaultValue={3} style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2 }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Posting Timezone</label>
+                    <input type="text" defaultValue="Asia/Kolkata" style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2 }} />
+                  </div>
+                </div>
+                <div style={{ marginTop: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Caption Template</label>
+                  <textarea defaultValue={`🔥 {productName} - Only {price}!\n\n✅ Free Shipping\n✅ 7-Day Returns\n\nShop now: {link}`} style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2, minHeight: 100, fontFamily: 'inherit' }} />
+                </div>
+                <button style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', background: 'var(--red)', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
+                  💾 Save Auto-Post Settings
+                </button>
+              </Card>
+            )}
+          </>
         )}
 
         {/* STORE SETTINGS TAB */}
@@ -234,27 +391,6 @@ export default function FounderAdminPage() {
                 {loading ? 'Saving...' : '💾 Save Changes'}
               </button>
             </div>
-          </div>
-        )}
-
-        {/* PRICING TAB */}
-        {activeTab === 'pricing' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
-            {['Starter', 'Growth', 'Pro'].map((plan) => (
-              <Card key={plan} title={`💎 ${plan} Plan`}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Monthly Price (₹)</label>
-                  <input type="number" defaultValue={plan === 'Starter' ? 999 : plan === 'Growth' ? 2999 : 5999} style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2 }} />
-                </div>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Features (one per line)</label>
-                  <textarea defaultValue={"10 products\nBasic analytics\nEmail support"} style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2, minHeight: 80, fontSize: '0.85rem', fontFamily: 'inherit' }} />
-                </div>
-                <button style={{ width: '100%', padding: '0.5rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}>
-                  Update {plan} Plan
-                </button>
-              </Card>
-            ))}
           </div>
         )}
 

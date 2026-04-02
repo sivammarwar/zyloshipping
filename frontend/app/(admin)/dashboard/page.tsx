@@ -43,7 +43,6 @@ const NAV_ITEMS = [
   { label: 'Products',   href: '/dashboard/products',   icon: '🏷' },
   { label: 'Suppliers',  href: '/dashboard/suppliers',  icon: '🔗' },
   { label: 'Analytics',  href: '/dashboard/analytics',  icon: '📊' },
-  { label: 'Social Media', href: '/dashboard/social-media/accounts', icon: '📱' },
   { label: 'AI Agents',  href: '/dashboard/agents',     icon: '🤖' },
   { label: 'Settings',   href: '/dashboard/settings',   icon: '⚙️' },
 ];
