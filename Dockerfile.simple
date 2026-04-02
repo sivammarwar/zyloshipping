@@ -1,0 +1,20 @@
+# Simple Dockerfile for Railway - no multi-stage for faster builds
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache openssl
+
+# Copy everything
+COPY . .
+
+# Install deps
+RUN npm ci
+
+# Generate Prisma and build
+WORKDIR /app/backend
+RUN npx prisma generate && npm run build
+
+EXPOSE 4000
+
+CMD sh -c "npx prisma db push --accept-data-loss && npx prisma db seed || true && node dist/index.js"

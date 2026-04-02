@@ -3,7 +3,7 @@
 
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "Dockerfile.simple"
 watchPatterns = ["Dockerfile", "backend/**", "shared/**", "package*.json"]
 
 [deploy]
