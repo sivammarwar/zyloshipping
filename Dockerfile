@@ -21,5 +21,5 @@ RUN npm ci
 WORKDIR /app/backend
 RUN npx prisma generate && npm run build
 
-# Start (with migrations - DATABASE_URL available at runtime)
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Start
+CMD ["node", "dist/index.js"]
