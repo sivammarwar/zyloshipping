@@ -306,7 +306,7 @@ router.get('/callback/twitter', async (req: Request, res: Response) => {
     
     res.redirect(`${process.env.FRONTEND_URL}/adminsiva/social/accounts?success=twitter_connected`);
     
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Twitter OAuth Error]:', err?.response?.data || err);
     res.redirect(`${process.env.FRONTEND_URL}/adminsiva/social/accounts?error=twitter_failed`);
   }
