@@ -15,6 +15,7 @@ COPY shared/ ./shared/
 COPY backend/ ./backend/
 
 # Install all dependencies from repo root (resolves workspaces + @zyloshipping/shared)
+# This puts node_modules at /app/node_modules
 RUN npm ci
 
 # Generate Prisma Client
@@ -36,12 +37,13 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nodejs
 
 # Copy built app
-COPY --from=builder --chown=nodejs:nodejs /app/backend/dist          ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/backend/node_modules  ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/backend/package.json  ./package.json
-COPY --from=builder --chown=nodejs:nodejs /app/backend/prisma        ./prisma
-# shared may be needed at runtime if imported directly
-COPY --from=builder --chown=nodejs:nodejs /app/shared                ./shared
+COPY --from=builder --chown=nodejs:nodejs /app/backend/dist         ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/backend/package.json ./package.json
+COPY --from=builder --chown=nodejs:nodejs /app/backend/prisma       ./prisma
+# node_modules is at REPO ROOT (/app/node_modules) because npm ci ran from /app
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules         ./node_modules
+# shared package needed at runtime for @zyloshipping/shared imports
+COPY --from=builder --chown=nodejs:nodejs /app/shared               ./shared
 
 USER nodejs
 
