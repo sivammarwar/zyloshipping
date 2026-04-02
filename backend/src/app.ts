@@ -28,6 +28,7 @@ import supportRoutes from './routes/support.routes';
 import reviewRoutes from './routes/reviews.routes';
 import socialMediaRoutes from './routes/socialMedia.routes';
 import socialMediaOAuthRoutes from './routes/socialMedia.oauth.routes';
+import storeRoutes from './routes/store.routes';
 
 // Patterns that are always allowed regardless of env vars
 const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
@@ -151,6 +152,7 @@ export function createApp(): Express {
   app.use('/api/suppliers', rateLimitGeneral, supplierRoutes);
   app.use('/api/support', rateLimitGeneral, supportRoutes);
   app.use('/api/reviews', rateLimitGeneral, reviewRoutes);
+  app.use('/api/user/store', rateLimitGeneral, storeRoutes);
 
   app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 
