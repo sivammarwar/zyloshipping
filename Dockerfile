@@ -38,14 +38,17 @@ RUN apk add --no-cache dumb-init openssl
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nodejs
 
-# Copy built app
+# Copy built app and startup script
 COPY --from=builder --chown=nodejs:nodejs /app/backend/dist         ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/backend/package.json ./package.json
 COPY --from=builder --chown=nodejs:nodejs /app/backend/prisma       ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/backend/start.sh     ./start.sh
 # node_modules is at REPO ROOT (/app/node_modules) because npm ci ran from /app
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules         ./node_modules
 # shared package needed at runtime for @zyloshipping/shared imports
 COPY --from=builder --chown=nodejs:nodejs /app/shared               ./shared
+
+RUN chmod +x ./start.sh
 
 EXPOSE 4000
 
@@ -53,4 +56,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx prisma db seed || true && node dist/index.js"]
+CMD ["./start.sh"]
