@@ -1,27 +1,24 @@
-# ZyloShipping API - 202504020906
-FROM node:20-alpine3.19 AS builder
-WORKDIR /app
+FROM docker.io/library/node:20-alpine3.19
+
 RUN apk add --no-cache openssl libc6-compat
-COPY package*.json ./
+
+WORKDIR /app
+
+# Copy root workspace files
+COPY package.json package-lock.json ./
+
+# Copy workspace packages
 COPY shared ./shared
 COPY backend ./backend
-RUN npm install
-WORKDIR /app/shared
-RUN npx tsc || true
-WORKDIR /app/backend
-RUN npx prisma generate && npx tsc
 
-FROM node:20-alpine3.19 AS app
-WORKDIR /app
-ENV NODE_ENV=production
-RUN apk add --no-cache openssl libc6-compat
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend/dist ./dist
-COPY --from=builder /app/backend/package.json ./package.json
-COPY --from=builder /app/backend/prisma ./prisma
-RUN mkdir -p shared/dist
-RUN cp -r /app/shared/dist/* shared/dist/ 2>/dev/null || echo "Shared dist not found, skipping"
+# Install all dependencies from root (npm workspaces)
+RUN npm ci
+
+# Generate Prisma client
+WORKDIR /app/backend
 RUN npx prisma generate
-EXPOSE 4000
-USER node
-CMD ["node", "dist/server.js"]
+
+# Build
+RUN npm run build
+
+CMD ["node", "dist/index.js"]
