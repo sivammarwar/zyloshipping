@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -53,6 +53,18 @@ const platformConfig = {
 };
 
 export default function SocialAccountsPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: 'var(--off-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--sans)' }}>
+        <div style={{ fontSize: '1.2rem', color: 'var(--ink-muted)' }}>Loading...</div>
+      </div>
+    }>
+      <SocialAccountsContent />
+    </Suspense>
+  );
+}
+
+function SocialAccountsContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -182,14 +194,6 @@ export default function SocialAccountsPage() {
     localStorage.removeItem('founder_token');
     localStorage.removeItem('founder_email');
     window.location.href = '/adminsiva/login';
-  }
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--off-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--sans)' }}>
-        <div style={{ fontSize: '1.2rem', color: 'var(--ink-muted)' }}>Loading...</div>
-      </div>
-    );
   }
 
   return (
