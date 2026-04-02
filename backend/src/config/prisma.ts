@@ -26,6 +26,24 @@ export const prisma: PrismaClient =
     },
   });
 
+// Connection pool management for Railway (prevents ECONNRESET)
+prisma.$connect().catch((err) => {
+  console.error('[prisma] Initial connection failed:', err);
+});
+
+// Handle process signals for clean shutdown
+process.on('SIGTERM', async () => {
+  console.log('[prisma] SIGTERM received, disconnecting...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('[prisma] SIGINT received, disconnecting...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
 if (process.env.NODE_ENV !== 'production') {
   global.__prisma = prisma;
 }
