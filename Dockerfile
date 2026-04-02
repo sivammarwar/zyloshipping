@@ -21,5 +21,5 @@ RUN npm ci
 WORKDIR /app/backend
 RUN npx prisma generate && npm run build
 
-# Start with migrations
-CMD ["sh", "-c", "echo 'Running migrations...' && npx prisma migrate deploy && echo 'Starting server...' && node dist/index.js"]
+# Start
+CMD ["node", "dist/index.js"]
