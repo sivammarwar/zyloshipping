@@ -1,24 +1,22 @@
-FROM docker.io/library/node:20-alpine3.19
+FROM node:20-slim AS zyloshipping-api
 
-RUN apk add --no-cache openssl libc6-compat
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy root workspace files
+# Copy root workspace files first
 COPY package.json package-lock.json ./
 
-# Copy workspace packages
+# Copy all workspace packages
 COPY shared ./shared
 COPY backend ./backend
 
-# Install all dependencies from root (npm workspaces)
+# Install from root (npm workspaces hoists deps)
 RUN npm ci
 
-# Generate Prisma client
+# Generate Prisma and build
 WORKDIR /app/backend
-RUN npx prisma generate
+RUN npx prisma generate && npm run build
 
-# Build
-RUN npm run build
-
+# Start
 CMD ["node", "dist/index.js"]
