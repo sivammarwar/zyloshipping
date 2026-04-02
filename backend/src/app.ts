@@ -101,13 +101,8 @@ export function createApp(): Express {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  app.get('/health', async (_req, res, next) => {
-    try {
-      const payload = await getPublicHealthPayload();
-      res.json(payload);
-    } catch (e) {
-      next(e);
-    }
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
   // Apply specific rate limiters to different route groups
