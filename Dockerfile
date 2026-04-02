@@ -1,16 +1,16 @@
 # ZyloShipping Backend Dockerfile
-ARG CACHE_BUST=202504020220
+ARG CACHE_BUST=202504020837
 
-FROM node:20-alpine AS deps
+FROM node:20-alpine3.19 AS deps
 WORKDIR /app
-RUN echo "Cache bust: $CACHE_BUST"
+RUN echo "Build timestamp: $CACHE_BUST"
 RUN apk add --no-cache openssl libc6-compat
 COPY package.json package-lock.json* ./
 COPY shared ./shared
 COPY backend ./backend
 RUN npm ci --omit=dev
 
-FROM node:20-alpine AS build
+FROM node:20-alpine3.19 AS build
 WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
@@ -23,7 +23,7 @@ WORKDIR /app/backend
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-alpine AS runtime
+FROM node:20-alpine3.19 AS prod
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache openssl libc6-compat
