@@ -179,7 +179,7 @@ export default function AdminDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.5rem' }}>Revenue today</div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.8rem', fontWeight: 900, color: 'var(--ink)', lineHeight: 1, marginBottom: '0.4rem' }}>${stats.revenueToday.toFixed(2)}</div>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.8rem', fontWeight: 900, color: 'var(--ink)', lineHeight: 1, marginBottom: '0.4rem' }}>${stats?.revenueToday?.toFixed(2) ?? '0.00'}</div>
               </div>
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.5rem' }}>Orders today</div>
@@ -187,11 +187,11 @@ export default function AdminDashboard() {
               </div>
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.5rem' }}>Avg order value</div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.8rem', fontWeight: 900, color: 'var(--ink)', lineHeight: 1, marginBottom: '0.4rem' }}>${stats.avgOrderValue.toFixed(2)}</div>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.8rem', fontWeight: 900, color: 'var(--ink)', lineHeight: 1, marginBottom: '0.4rem' }}>${stats?.avgOrderValue?.toFixed(2) ?? '0.00'}</div>
               </div>
               <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.25rem 1.5rem' }}>
                 <div style={{ fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.5rem' }}>Delivery success</div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.8rem', fontWeight: 900, color: 'var(--ink)', lineHeight: 1, marginBottom: '0.4rem' }}>{stats.deliverySuccessRate.toFixed(1)}%</div>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.8rem', fontWeight: 900, color: 'var(--ink)', lineHeight: 1, marginBottom: '0.4rem' }}>{stats?.deliverySuccessRate?.toFixed(1) ?? '0.0'}%</div>
               </div>
             </div>
           ) : null}
@@ -231,7 +231,7 @@ export default function AdminDashboard() {
                       <td style={{ padding: '0.8rem 0.5rem', fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--ink)', fontSize: '0.85rem' }}>#{o.orderNumber}</td>
                       <td style={{ padding: '0.8rem 0.5rem', color: 'var(--ink-muted)' }}>{o.user?.name || 'Unknown'}</td>
                       <td style={{ padding: '0.8rem 0.5rem', color: 'var(--ink-faint)' }}>{o.items?.length || 0}</td>
-                      <td style={{ padding: '0.8rem 0.5rem', fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--red)' }}>${o.totalAmount}</td>
+                      <td style={{ padding: '0.8rem 0.5rem', fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--red)' }}>${o.totalAmount?.toFixed(2) ?? '0.00'}</td>
                       <td style={{ padding: '0.8rem 0.5rem' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: 500, padding: '0.2rem 0.5rem', borderRadius: 1, background: s.bg, color: s.color, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{s.label}</span>
                       </td>
