@@ -27,6 +27,7 @@ import adminRoutes from './routes/admin.routes';
 import supportRoutes from './routes/support.routes';
 import reviewRoutes from './routes/reviews.routes';
 import socialMediaRoutes from './routes/socialMedia.routes';
+import socialMediaOAuthRoutes from './routes/socialMedia.oauth.routes';
 
 // Patterns that are always allowed regardless of env vars
 const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
@@ -140,6 +141,7 @@ export function createApp(): Express {
   app.use('/api/payments', rateLimitPayment, paymentRoutes);
   app.use('/api/admin', adminRoutes); // Rate limiting disabled for testing
   app.use('/api/admin/social-media', rateLimitAdmin, socialMediaRoutes);
+  app.use('/api/admin/social-media', socialMediaOAuthRoutes); // OAuth callbacks (no rate limit)
   app.use('/api/webhooks', webhookRoutes); // No rate limit on webhooks
   
   // General rate limiter for all other routes
