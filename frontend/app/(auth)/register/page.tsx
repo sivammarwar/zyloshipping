@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Step = 1 | 2;
 
@@ -25,6 +26,7 @@ export default function RegisterPage() {
   const [step, setStep]           = useState<Step>(1);
   const [loading, setLoading]     = useState(false);
   const [done, setDone]           = useState(false);
+  const router = useRouter();
 
   // Step 1 fields
   const [firstName, setFirstName] = useState('');
@@ -61,16 +63,57 @@ export default function RegisterPage() {
     setStep(2);
   }
 
-  function handleRegister() {
+  async function handleRegister() {
     if (!storeType || !country) { setError('Please complete all fields.'); return; }
     if (!agreed) { setError('Please accept the Terms of Service.'); return; }
     setError('');
     setLoading(true);
-    setTimeout(() => { setLoading(false); setDone(true); }, 1800);
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          name: `${firstName} ${lastName}`,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          setError('Email already registered. Please sign in instead.');
+        } else {
+          setError(data.error || 'Registration failed. Please try again.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Save token and user data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      setLoading(false);
+      setDone(true);
+    } catch (err) {
+      setError('Network error. Please check your connection and try again.');
+      setLoading(false);
+    }
   }
 
   // ── Done screen ───────────────────────────────────────────
   if (done) {
+    // Auto-redirect to dashboard after 2 seconds
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        router.push('/dashboard');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }, [router]);
+
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--off-white)', padding: '2rem', fontFamily: 'var(--sans)' }}>
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
@@ -82,12 +125,11 @@ export default function RegisterPage() {
             Welcome to ZyloShipping, <strong>{firstName}</strong>. Your account is ready.
           </p>
           <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', marginBottom: '2.5rem' }}>
-            We&apos;ve sent a confirmation to <strong>{email}</strong>
+            Redirecting to your dashboard...
           </p>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/products" style={{ padding: '0.8rem 2rem', background: 'var(--red)', color: 'var(--white)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500, fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.25)' }}>Browse products →</Link>
-            <Link href="/dashboard" style={{ padding: '0.8rem 1.5rem', background: 'none', border: '1.5px solid var(--border)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', color: 'var(--ink-muted)', fontFamily: 'var(--sans)' }}>Go to dashboard</Link>
-          </div>
+          <Link href="/dashboard" style={{ padding: '0.8rem 2rem', background: 'var(--red)', color: 'var(--white)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500, fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.25)' }}>
+            Go to dashboard →
+          </Link>
         </div>
       </div>
     );
