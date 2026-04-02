@@ -1,11 +1,10 @@
 FROM node:20-alpine3.19 AS build
 WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
-COPY backend/package.json backend/package-lock.json* ./
 COPY shared ./shared
 COPY backend ./backend
 WORKDIR /app/backend
-RUN npm ci
+RUN npm install
 RUN npx prisma generate
 RUN npm run build
 
