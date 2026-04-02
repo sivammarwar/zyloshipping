@@ -5,52 +5,34 @@ import Link from 'next/link';
 
 const FOUNDER_EMAIL = 'shivamkumarsingh8544@gmail.com';
 
-interface StoreSettings {
-  storeName: string;
-  currency: string;
-  maintenanceMode: boolean;
-  markupPercent: number;
-  activeCouponCode: string;
-  couponDiscountPct: number;
-}
-
 interface DashboardStats {
-  revenueToday: number;
-  ordersToday: number;
-  avgOrderValue: number;
-  deliverySuccessRate: number;
   totalRevenue: number;
   totalOrders: number;
   totalUsers: number;
-  totalProducts: number;
+  totalStores: number;
+  todayRevenue: number;
+  todayOrders: number;
 }
 
-interface SocialAccount {
-  id: string;
-  platform: 'INSTAGRAM' | 'FACEBOOK' | 'TWITTER' | 'REDDIT';
-  accountName: string;
-  accountHandle: string;
-  isActive: boolean;
-  postsPerDay: number;
-  followersCount: number;
-}
+const SIDEBAR_ITEMS = [
+  { id: 'overview', label: 'Overview', icon: '📊', href: '/adminsiva' },
+  { id: 'stores', label: 'Stores', icon: '🏪', href: '/adminsiva/stores' },
+  { id: 'orders', label: 'Orders', icon: '📦', href: '/adminsiva/orders' },
+  { id: 'products', label: 'Products', icon: '🏷', href: '/adminsiva/products' },
+  { id: 'suppliers', label: 'Suppliers', icon: '🔗', href: '/adminsiva/suppliers' },
+  { id: 'users', label: 'Users', icon: '👥', href: '/adminsiva/users' },
+  { id: 'analytics', label: 'Analytics', icon: '📈', href: '/adminsiva/analytics' },
+  { id: 'social', label: 'Social Media', icon: '📱', href: '/adminsiva/social/accounts' },
+  { id: 'agents', label: 'AI Agents', icon: '🤖', href: '/adminsiva/agents' },
+  { id: 'settings', label: 'Settings', icon: '⚙️', href: '/adminsiva/settings' },
+];
 
 export default function FounderAdminPage() {
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [activeTab, setActiveTab] = useState('overview');
-  const [settings, setSettings] = useState<StoreSettings>({
-    storeName: 'ZyloShipping',
-    currency: 'INR',
-    maintenanceMode: false,
-    markupPercent: 2.5,
-    activeCouponCode: '',
-    couponDiscountPct: 10,
-  });
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Check founder auth
   useEffect(() => {
     const founderToken = localStorage.getItem('founder_token');
     const founderEmail = localStorage.getItem('founder_email');
@@ -59,28 +41,14 @@ export default function FounderAdminPage() {
       window.location.href = '/adminsiva/login';
       return;
     }
-    
-    fetchSettings();
-    fetchDashboardData();
-    fetchSocialAccounts();
-  }, []);
 
-  async function fetchSettings() {
-    try {
-      const res = await fetch('/api/admin/settings');
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(prev => ({ ...prev, ...data.settings }));
-      }
-    } catch (err) {
-      console.error('Failed to load settings:', err);
-    }
-  }
+    fetchDashboardData();
+  }, []);
 
   async function fetchDashboardData() {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/dashboard/stats', {
+      const res = await fetch('/api/admin/founder/stats', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -89,42 +57,9 @@ export default function FounderAdminPage() {
       }
     } catch (err) {
       console.error('Failed to load dashboard:', err);
+    } finally {
+      setLoading(false);
     }
-  }
-
-  async function fetchSocialAccounts() {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/social-media/accounts', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSocialAccounts(data.accounts || []);
-      }
-    } catch (err) {
-      console.error('Failed to load social accounts:', err);
-    }
-  }
-
-  async function saveSettings() {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
-      });
-      if (res.ok) {
-        setMessage('✓ Saved successfully');
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage('✗ Failed to save');
-      }
-    } catch (err) {
-      setMessage('✗ Error saving');
-    }
-    setLoading(false);
   }
 
   function handleLogout() {
@@ -133,311 +68,349 @@ export default function FounderAdminPage() {
     window.location.href = '/adminsiva/login';
   }
 
-  const Card = ({ title, children, color = 'var(--white)', subtitle = '' }: any) => (
-    <div style={{ background: color, border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
-      <h3 style={{ fontFamily: 'var(--serif)', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>{title}</h3>
-      {subtitle && <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '0.25rem' }}>{subtitle}</div>}
-      {children}
+  const Card = ({ title, value, subtitle, icon, color = 'white' }: any) => (
+    <div style={{ 
+      background: color, 
+      border: '1px solid #e2e8f0', 
+      borderRadius: 8, 
+      padding: '1.5rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1rem'
+    }}>
+      <div style={{ fontSize: '2.5rem' }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', marginBottom: '0.25rem' }}>
+          {title}
+        </div>
+        <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a' }}>
+          {value}
+        </div>
+        {subtitle && (
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+            {subtitle}
+          </div>
+        )}
+      </div>
     </div>
-  );
-
-  const Input = ({ label, value, onChange, type = 'text' }: any) => (
-    <div style={{ marginBottom: '1rem' }}>
-      <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(type === 'checkbox' ? e.target.checked : e.target.value)}
-        style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2, fontSize: '0.9rem' }}
-      />
-    </div>
-  );
-
-  const Checkbox = ({ label, checked, onChange }: any) => (
-    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '0.75rem' }}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ width: 18, height: 18 }} />
-      <span style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{label}</span>
-    </label>
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--off-white)', fontFamily: 'var(--sans)' }}>
-      {/* Header */}
-      <header style={{ background: 'var(--ink)', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ width: 32, height: 32, background: 'var(--red)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontFamily: 'var(--serif)', fontWeight: 900, color: 'white', fontSize: '1rem' }}>Z</span>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: 'var(--sans)' }}>
+      {/* Sidebar */}
+      <aside style={{ 
+        width: sidebarOpen ? 260 : 70, 
+        background: '#0f172a', 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        zIndex: 100,
+        transition: 'width 0.3s',
+        overflow: 'hidden'
+      }}>
+        {/* Logo */}
+        <div style={{ 
+          padding: '1.5rem', 
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <div style={{ 
+            width: 36, 
+            height: 36, 
+            background: '#dc2626', 
+            borderRadius: 6, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <span style={{ fontFamily: 'var(--serif)', fontWeight: 900, color: 'white', fontSize: '1.2rem' }}>Z</span>
           </div>
-          <span style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 900, color: 'white' }}>
-            Zylo<span style={{ color: 'var(--red)' }}>.</span> <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', fontWeight: 400 }}>Founder Panel</span>
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {message && (
-            <span style={{ fontSize: '0.8rem', color: message.startsWith('✓') ? '#22c55e' : '#ef4444' }}>{message}</span>
+          {sidebarOpen && (
+            <span style={{ fontFamily: 'var(--serif)', fontSize: '1.3rem', fontWeight: 900, color: 'white' }}>
+              Zylo<span style={{ color: '#dc2626' }}>.</span>
+            </span>
           )}
-          <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>👑 {FOUNDER_EMAIL}</span>
-          <button onClick={handleLogout} style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}>
-            Logout
-          </button>
         </div>
-      </header>
 
-      {/* Tabs */}
-      <div style={{ background: 'var(--white)', borderBottom: '1px solid var(--border)', padding: '0 2rem' }}>
-        <div style={{ display: 'flex', gap: '2rem' }}>
-          {[
-            { id: 'earnings', label: '💰 Earnings' },
-            { id: 'social', label: '📱 Social Media' },
-            { id: 'store', label: '🏪 Store' },
-            { id: 'system', label: '⚙️ System' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+        {/* Toggle */}
+        <button 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          style={{
+            position: 'absolute',
+            right: sidebarOpen ? 10 : '50%',
+            top: 80,
+            transform: sidebarOpen ? 'none' : 'translateX(50%)',
+            width: 24,
+            height: 24,
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            borderRadius: 4,
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.8rem'
+          }}
+        >
+          {sidebarOpen ? '←' : '→'}
+        </button>
+
+        {/* Nav Items */}
+        <nav style={{ padding: '1rem 0.75rem', marginTop: '1rem' }}>
+          {SIDEBAR_ITEMS.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
               style={{
-                padding: '1rem 0',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: `2px solid ${activeTab === tab.id ? 'var(--red)' : 'transparent'}`,
-                color: activeTab === tab.id ? 'var(--red)' : 'var(--ink-muted)',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.875rem 1rem',
+                margin: '0.25rem 0',
+                borderRadius: 6,
+                color: item.id === 'overview' ? 'white' : 'rgba(255,255,255,0.6)',
+                background: item.id === 'overview' ? 'rgba(220,38,38,0.2)' : 'transparent',
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 500
               }}
             >
-              {tab.label}
-            </button>
+              <span style={{ fontSize: '1.2rem', width: 24, textAlign: 'center' }}>{item.icon}</span>
+              {sidebarOpen && <span>{item.label}</span>}
+            </Link>
           ))}
+        </nav>
+
+        {/* Logout */}
+        <div style={{ 
+          position: 'absolute', 
+          bottom: 0, 
+          left: 0, 
+          right: 0, 
+          padding: '1rem',
+          borderTop: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              width: '100%',
+              padding: '0.75rem',
+              background: 'rgba(255,255,255,0.05)',
+              border: 'none',
+              borderRadius: 6,
+              color: 'rgba(255,255,255,0.7)',
+              cursor: 'pointer',
+              fontSize: '0.85rem'
+            }}
+          >
+            <span>🚪</span>
+            {sidebarOpen && <span>Logout</span>}
+          </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Content */}
-      <div style={{ padding: '2rem', maxWidth: 1200, margin: '0 auto' }}>
-        
-        {/* EARNINGS TAB */}
-        {activeTab === 'earnings' && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
-              <Card title="Today's Revenue" subtitle={`${settings.currency === 'INR' ? '₹' : '$'}${stats?.revenueToday?.toFixed(2) ?? '0.00'}`} color="#fef3c7" />
-              <Card title="Today's Orders" subtitle={stats?.ordersToday ?? '0'} color="#dbeafe" />
-              <Card title="Total Revenue" subtitle={`${settings.currency === 'INR' ? '₹' : '$'}${stats?.totalRevenue?.toFixed(2) ?? '0.00'}`} color="#dcfce7" />
-              <Card title="Total Orders" subtitle={stats?.totalOrders ?? '0'} color="#fce7f3" />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
-              <Card title="Avg Order Value" subtitle={`${settings.currency === 'INR' ? '₹' : '$'}${stats?.avgOrderValue?.toFixed(2) ?? '0.00'}`} />
-              <Card title="Delivery Success" subtitle={`${stats?.deliverySuccessRate?.toFixed(1) ?? '0.0'}%`} />
-              <Card title="Total Users" subtitle={stats?.totalUsers ?? '0'} />
-            </div>
-
-            <Card title="⚡ Quick Actions">
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <Link href="/dashboard" style={{ padding: '0.75rem 1.5rem', background: 'var(--red)', color: 'white', borderRadius: 4, textDecoration: 'none', fontSize: '0.85rem' }}>
-                  🏪 Store Dashboard
-                </Link>
-                <button onClick={() => setActiveTab('store')} style={{ padding: '0.75rem 1.5rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
-                  ⚙️ Store Settings
-                </button>
-                <button onClick={() => setActiveTab('social')} style={{ padding: '0.75rem 1.5rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
-                  � Social Media
-                </button>
-              </div>
-            </Card>
-          </>
-        )}
-
-        {/* SOCIAL MEDIA TAB */}
-        {activeTab === 'social' && (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.3rem', color: 'var(--ink)' }}>📱 Social Media Auto-Posting</h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <Link href="/adminsiva/social/accounts" style={{ padding: '0.75rem 1.5rem', background: 'var(--red)', color: 'white', borderRadius: 4, textDecoration: 'none', fontSize: '0.85rem' }}>
-                  + Connect Account
-                </Link>
-              </div>
-            </div>
-
-            {socialAccounts.length === 0 ? (
-              <Card>
-                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📱</div>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', color: 'var(--ink)', marginBottom: '0.5rem' }}>No Social Accounts Connected</h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--ink-faint)', marginBottom: '1rem' }}>Connect Instagram, Facebook, Twitter to auto-post products</p>
-                  <Link href="/adminsiva/social/accounts" style={{ padding: '0.6rem 1.2rem', background: 'var(--red)', color: 'white', borderRadius: 4, textDecoration: 'none', fontSize: '0.8rem' }}>
-                    + Connect First Account
-                  </Link>
-                </div>
-              </Card>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
-                {socialAccounts.map((account) => (
-                  <div key={account.id} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 4, padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                      <span style={{ fontSize: '1.5rem' }}>
-                        {account.platform === 'INSTAGRAM' && '📸'}
-                        {account.platform === 'FACEBOOK' && '📘'}
-                        {account.platform === 'TWITTER' && '🐦'}
-                        {account.platform === 'REDDIT' && '🔴'}
-                      </span>
-                      <div>
-                        <div style={{ fontWeight: 600, color: 'var(--ink)' }}>@{account.accountHandle}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--ink-faint)' }}>{account.accountName}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
-                      <div style={{ background: 'var(--off-white)', padding: '0.5rem', borderRadius: 4, textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--ink-faint)' }}>Followers</div>
-                        <div style={{ fontWeight: 600 }}>{account.followersCount?.toLocaleString() ?? 0}</div>
-                      </div>
-                      <div style={{ background: 'var(--off-white)', padding: '0.5rem', borderRadius: 4, textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--ink-faint)' }}>Posts/Day</div>
-                        <div style={{ fontWeight: 600 }}>{account.postsPerDay}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                        onClick={() => {
-                          const token = localStorage.getItem('token');
-                          fetch(`/api/admin/social-media/accounts/${account.id}`, { 
-                            method: 'PUT', 
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
-                            body: JSON.stringify({ isActive: !account.isActive }) 
-                          }).then(() => fetchSocialAccounts());
-                        }}
-                        style={{ flex: 1, padding: '0.5rem', background: account.isActive ? '#fee2e2' : '#dcfce7', color: account.isActive ? '#991b1b' : '#166534', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}
-                      >
-                        {account.isActive ? '⏸ Pause' : '▶ Resume'}
-                      </button>
-                      <button 
-                        onClick={() => {
-                          if (confirm('Disconnect this account?')) {
-                            const token = localStorage.getItem('token');
-                            fetch(`/api/admin/social-media/accounts/${account.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }).then(() => fetchSocialAccounts());
-                          }
-                        }}
-                        style={{ padding: '0.5rem 0.75rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      {/* Main Content */}
+      <main style={{ 
+        marginLeft: sidebarOpen ? 260 : 70, 
+        flex: 1,
+        transition: 'margin-left 0.3s'
+      }}>
+        {/* Header */}
+        <header style={{ 
+          background: 'white', 
+          padding: '1rem 2rem',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h1 style={{ fontFamily: 'var(--serif)', fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+              Founder Dashboard
+            </h1>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0.25rem 0 0' }}>
+              Platform Overview & Management
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {message && (
+              <span style={{ 
+                padding: '0.5rem 1rem', 
+                background: message.startsWith('✓') ? '#dcfce7' : '#fee2e2',
+                color: message.startsWith('✓') ? '#166534' : '#991b1b',
+                borderRadius: 4,
+                fontSize: '0.85rem'
+              }}>
+                {message}
+              </span>
             )}
-
-            {socialAccounts.length > 0 && (
-              <Card title="🤖 Auto-Post Settings" style={{ marginTop: '2rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Default Posts Per Day</label>
-                    <input type="number" defaultValue={3} style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2 }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Posting Timezone</label>
-                    <input type="text" defaultValue="Asia/Kolkata" style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2 }} />
-                  </div>
-                </div>
-                <div style={{ marginTop: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '0.35rem' }}>Caption Template</label>
-                  <textarea defaultValue={`🔥 {productName} - Only {price}!\n\n✅ Free Shipping\n✅ 7-Day Returns\n\nShop now: {link}`} style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 2, minHeight: 100, fontFamily: 'inherit' }} />
-                </div>
-                <button style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', background: 'var(--red)', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
-                  💾 Save Auto-Post Settings
-                </button>
-              </Card>
-            )}
-          </>
-        )}
-
-        {/* STORE SETTINGS TAB */}
-        {activeTab === 'store' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
-            <Card title="🏪 Store Identity">
-              <Input label="Store Name" value={settings.storeName} onChange={(v: string) => setSettings({ ...settings, storeName: v })} />
-              <Input label="Currency" value={settings.currency} onChange={(v: string) => setSettings({ ...settings, currency: v })} />
-              <Checkbox label="🔒 Maintenance Mode" checked={settings.maintenanceMode} onChange={(v: boolean) => setSettings({ ...settings, maintenanceMode: v })} />
-              <p style={{ fontSize: '0.75rem', color: 'var(--ink-faint)', marginTop: '0.5rem' }}>
-                When enabled, only admins can access the store
-              </p>
-            </Card>
-
-            <Card title="💰 Pricing & Coupons">
-              <Input label="Markup Multiplier" type="number" step="0.1" value={settings.markupPercent} onChange={(v: string) => setSettings({ ...settings, markupPercent: Number(v) })} />
-              <p style={{ fontSize: '0.75rem', color: 'var(--ink-faint)', marginBottom: '1rem' }}>
-                Product price = Supplier cost × {settings.markupPercent}
-              </p>
-              <Input label="Active Coupon Code" value={settings.activeCouponCode} onChange={(v: string) => setSettings({ ...settings, activeCouponCode: v })} />
-              <Input label="Coupon Discount %" type="number" value={settings.couponDiscountPct} onChange={(v: string) => setSettings({ ...settings, couponDiscountPct: Number(v) })} />
-            </Card>
-
-            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={saveSettings}
-                disabled={loading}
-                style={{
-                  padding: '0.75rem 2rem',
-                  background: 'var(--red)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: 500,
-                  opacity: loading ? 0.6 : 1,
-                }}
-              >
-                {loading ? 'Saving...' : '💾 Save Changes'}
-              </button>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>👑 Founder</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{FOUNDER_EMAIL}</div>
             </div>
           </div>
-        )}
+        </header>
 
-        {/* SYSTEM TAB */}
-        {activeTab === 'system' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
-            <Card title="🗄️ Database">
-              <p style={{ fontSize: '0.85rem', color: 'var(--ink-faint)', marginBottom: '1rem' }}>
-                Backup and manage your database
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button style={{ padding: '0.6rem 1rem', background: 'var(--red)', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}>
-                  📥 Backup Now
-                </button>
-                <button style={{ padding: '0.6rem 1rem', background: 'var(--off-white)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}>
-                  📤 Export Data
-                </button>
-              </div>
-            </Card>
-
-            <Card title="🤖 AI Agents">
-              <p style={{ fontSize: '0.85rem', color: 'var(--ink-faint)', marginBottom: '1rem' }}>
-                Control AI automation agents
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <Link href="/dashboard/agents" style={{ padding: '0.6rem 1rem', background: 'var(--red)', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'none' }}>
-                  Manage Agents
-                </Link>
-              </div>
-            </Card>
-
-            <Card title="⚠️ Danger Zone" color="#fef2f2">
-              <p style={{ fontSize: '0.85rem', color: '#991b1b', marginBottom: '1rem' }}>
-                These actions cannot be undone
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button style={{ padding: '0.6rem 1rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}>
-                  Clear Cache
-                </button>
-                <button style={{ padding: '0.6rem 1rem', background: '#7f1d1d', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.8rem' }}>
-                  Reset All Data
-                </button>
-              </div>
-            </Card>
+        {/* Content */}
+        <div style={{ padding: '2rem' }}>
+          {/* Stats */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(4, 1fr)', 
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <Card 
+              title="Total Revenue" 
+              value={`₹${stats?.totalRevenue?.toLocaleString() ?? '0'}`}
+              subtitle={`+₹${stats?.todayRevenue?.toLocaleString() ?? '0'} today`}
+              icon="💰"
+              color="#fef3c7"
+            />
+            <Card 
+              title="Total Orders" 
+              value={stats?.totalOrders?.toLocaleString() ?? '0'}
+              subtitle={`+${stats?.todayOrders ?? '0'} today`}
+              icon="📦"
+              color="#dbeafe"
+            />
+            <Card 
+              title="Active Users" 
+              value={stats?.totalUsers?.toLocaleString() ?? '0'}
+              subtitle="Registered accounts"
+              icon="👥"
+              color="#dcfce7"
+            />
+            <Card 
+              title="Stores" 
+              value={stats?.totalStores?.toLocaleString() ?? '0'}
+              subtitle="Active shops"
+              icon="🏪"
+              color="#fce7f3"
+            />
           </div>
-        )}
-      </div>
+
+          {/* Quick Actions */}
+          <div style={{ 
+            background: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            padding: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>
+              ⚡ Quick Actions
+            </h2>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <Link href="/adminsiva/stores" style={{
+                padding: '0.75rem 1.5rem',
+                background: '#dc2626',
+                color: 'white',
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 500
+              }}>
+                🏪 Manage Stores
+              </Link>
+              <Link href="/adminsiva/orders" style={{
+                padding: '0.75rem 1.5rem',
+                background: '#f1f5f9',
+                color: '#0f172a',
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 500
+              }}>
+                📦 View Orders
+              </Link>
+              <Link href="/adminsiva/social/accounts" style={{
+                padding: '0.75rem 1.5rem',
+                background: '#f1f5f9',
+                color: '#0f172a',
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 500
+              }}>
+                📱 Social Media
+              </Link>
+              <Link href="/adminsiva/agents" style={{
+                padding: '0.75rem 1.5rem',
+                background: '#f1f5f9',
+                color: '#0f172a',
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 500
+              }}>
+                🤖 AI Agents
+              </Link>
+            </div>
+          </div>
+
+          {/* Two Column */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+            <div style={{
+              background: 'white',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '1.5rem'
+            }}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>
+                📊 Platform Overview
+              </h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 6 }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Products</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>0</div>
+                </div>
+                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 6 }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Suppliers</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>2</div>
+                </div>
+                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 6 }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Social Accounts</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>0</div>
+                </div>
+                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 6 }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>AI Agents</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>8</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'white',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '1.5rem'
+            }}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>
+                🖥️ System Status
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: '#dcfce7', borderRadius: 6 }}>
+                  <span style={{ color: '#166534' }}>✅ API</span>
+                  <span style={{ fontSize: '0.75rem', color: '#166534' }}>Online</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: '#dcfce7', borderRadius: 6 }}>
+                  <span style={{ color: '#166534' }}>✅ Database</span>
+                  <span style={{ fontSize: '0.75rem', color: '#166534' }}>Connected</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

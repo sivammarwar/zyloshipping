@@ -44,6 +44,8 @@ model User {
   adminCart     AdminCart?
   passwordResets PasswordResetToken[]
   adminLogs      AdminLog[]
+  stores        Store[]     // Stores owned by this user
+  storeMemberships StoreMember[] // Stores where user is a member
 
   @@map("users")
 }
@@ -127,6 +129,105 @@ model TeamMember {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// STORES (Multi-tenant: Users can create their own stores)
+// ═══════════════════════════════════════════════════════════════
+
+model Store {
+  id          String   @id @default(cuid())
+  ownerId     String   @map("owner_id")
+  name        String
+  slug        String   @unique
+  description String?  @db.Text
+  logo        String?
+  banner      String?
+  
+  // Contact
+  email       String?
+  phone       String?
+  address     String?
+  
+  // Settings
+  currency    String   @default("INR")
+  timezone    String   @default("Asia/Kolkata")
+  theme       String   @default("default")
+  isActive    Boolean  @default(true) @map("is_active")
+  isPublic    Boolean  @default(false) @map("is_public") // Public store page
+  
+  // Subscription
+  planId      String?  @map("plan_id")
+  planExpiresAt DateTime? @map("plan_expires_at")
+  
+  // Stats
+  totalProducts Int    @default(0) @map("total_products")
+  totalOrders   Int    @default(0) @map("total_orders")
+  totalRevenue  Float  @default(0) @map("total_revenue")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  owner       User          @relation(fields: [ownerId], references: [id])
+  members     StoreMember[]
+  products    StoreProduct[]
+  storeOrders StoreOrder[]
+  
+  @@index([ownerId])
+  @@index([slug])
+  @@map("stores")
+}
+
+model StoreMember {
+  id        String   @id @default(cuid())
+  storeId   String   @map("store_id")
+  userId    String   @map("user_id")
+  role      StoreMemberRole @default(EDITOR)
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([storeId, userId])
+  @@map("store_members")
+}
+
+model StoreProduct {
+  id          String @id @default(cuid())
+  storeId     String @map("store_id")
+  productId   String @map("product_id")
+  customPrice Float? @map("custom_price")
+  isFeatured  Boolean @default(false) @map("is_featured")
+  addedAt     DateTime @default(now()) @map("added_at")
+  
+  store       Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([storeId, productId])
+  @@map("store_products")
+}
+
+model StoreOrder {
+  id          String   @id @default(cuid())
+  storeId     String   @map("store_id")
+  orderId     String   @map("order_id")
+  commission  Float    @default(0)
+  status      String   @default("pending") // pending, paid, refunded
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  store       Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order       Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@unique([storeId, orderId])
+  @@map("store_orders")
+}
+
+enum StoreMemberRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+// ═══════════════════════════════════════════════════════════════
 // PRODUCTS
 // ═══════════════════════════════════════════════════════════════
 
@@ -164,6 +265,7 @@ model Product {
   cartItems  CartItem[]
   adminCartItems AdminCartItem[]
   pipelineItem ProductPipeline?
+  storeProducts StoreProduct[] // Products added to stores
 
   @@index([status, category])
   @@index([supplierId, status])
@@ -265,6 +367,7 @@ model Order {
   commission      Commission?
   tracking        OrderTracking[]
   transitionLogs  OrderTransitionLog[]
+  storeOrders     StoreOrder[] // Orders in stores
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
