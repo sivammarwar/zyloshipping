@@ -3,7 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
+# openssl needed for Prisma engine generation on Alpine
+RUN apk add --no-cache dumb-init openssl
 
 # Copy root-level lock file and workspace manifests first (for layer caching)
 COPY package.json package-lock.json* ./
@@ -18,7 +19,7 @@ COPY backend/ ./backend/
 # This puts node_modules at /app/node_modules
 RUN npm ci
 
-# Generate Prisma Client
+# Generate Prisma Client with correct binary for Alpine (musl + openssl 3)
 WORKDIR /app/backend
 RUN npx prisma generate
 
@@ -30,7 +31,8 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
+# openssl required by Prisma query engine at runtime on Alpine
+RUN apk add --no-cache dumb-init openssl
 
 # Non-root user
 RUN addgroup --system --gid 1001 nodejs && \
