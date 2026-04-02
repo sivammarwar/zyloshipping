@@ -3,32 +3,26 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dumb-init early
 RUN apk add --no-cache dumb-init
 
-# ── Copy shared package first ──
-# The monorepo's shared package must be present so `npm ci` can resolve
-# "@zyloshipping/shared": "*" in the backend's package.json
+# Copy root-level lock file and workspace manifests first (for layer caching)
+COPY package.json package-lock.json* ./
+
+# Copy shared package
 COPY shared/ ./shared/
 
-# ── Copy backend source ──
-COPY backend/package.json backend/package-lock.json* ./backend/
-COPY backend/tsconfig.json ./backend/
-COPY backend/src ./backend/src
-COPY backend/prisma ./backend/prisma
+# Copy backend
+COPY backend/ ./backend/
 
-# ── Install ALL deps (including dev, needed for tsc) ──
-WORKDIR /app/backend
+# Install all dependencies from repo root (resolves workspaces + @zyloshipping/shared)
 RUN npm ci
 
-# ── Generate Prisma Client ──
+# Generate Prisma Client
+WORKDIR /app/backend
 RUN npx prisma generate
 
-# ── Compile TypeScript ──
+# Build TypeScript
 RUN npm run build
-
-# ── Prune to production deps only ──
-RUN npm ci --only=production && npm cache clean --force
 
 # ── Stage 2: Runner ───────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
@@ -41,11 +35,13 @@ RUN apk add --no-cache dumb-init
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nodejs
 
-# Copy only what's needed to run
-COPY --from=builder --chown=nodejs:nodejs /app/backend/dist        ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/backend/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/backend/package.json ./package.json
-COPY --from=builder --chown=nodejs:nodejs /app/backend/prisma      ./prisma
+# Copy built app
+COPY --from=builder --chown=nodejs:nodejs /app/backend/dist          ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/backend/node_modules  ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/backend/package.json  ./package.json
+COPY --from=builder --chown=nodejs:nodejs /app/backend/prisma        ./prisma
+# shared may be needed at runtime if imported directly
+COPY --from=builder --chown=nodejs:nodejs /app/shared                ./shared
 
 USER nodejs
 
