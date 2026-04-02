@@ -18,7 +18,7 @@ const getDatabaseUrl = () => {
   
   // Railway PostgreSQL requires SSL
   if (url.includes('railway.app') || process.env.RAILWAY_ENVIRONMENT) {
-    // Append sslmode=require if not already present
+    // Use sslmode=require for Railway PostgreSQL
     if (!url.includes('sslmode=')) {
       return url.includes('?') ? `${url}&sslmode=require` : `${url}?sslmode=require`;
     }
