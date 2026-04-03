@@ -45,6 +45,9 @@ export default function LoginPage() {
         // (covers the case where the same login page is used for both roles)
         document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
+        // Notify header and other components about auth change
+        window.dispatchEvent(new Event('auth-changed'));
+
         const params   = new URLSearchParams(window.location.search);
         const redirect = params.get('redirect') || '/';
         window.location.href = redirect;

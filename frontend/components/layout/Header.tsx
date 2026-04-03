@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 const NAV_LINKS = [
   { label: 'Products',    href: '/products' },
@@ -18,7 +19,7 @@ function useCartCount() {
 
     async function fetchCount() {
       try {
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
         if (!token) return;
 
         const res = await fetch(
@@ -28,7 +29,6 @@ function useCartCount() {
         if (!res.ok) return;
 
         const data = await res.json();
-        // Handle both { items: [] } and { cart: { items: [] } } shapes
         const items: Array<{ quantity: number }> =
           data?.items ?? data?.cart?.items ?? [];
         const total = items.reduce((s, i) => s + (i.quantity ?? 1), 0);
@@ -40,8 +40,6 @@ function useCartCount() {
     }
 
     fetchCount();
-
-    // Re-fetch when the custom 'cart-updated' event fires
     const handler = () => fetchCount();
     window.addEventListener('cart-updated', handler);
     return () => {
@@ -53,16 +51,77 @@ function useCartCount() {
   return count;
 }
 
+/** Hook to get current user from token */
+function useAuth() {
+  const [user, setUser] = useState<{ email: string; role: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUser({ email: payload.email, role: payload.role });
+      } catch {
+        setUser(null);
+      }
+    }
+
+    // Listen for auth changes
+    const handler = () => {
+      const t = localStorage.getItem('token') || localStorage.getItem('auth_token');
+      if (t) {
+        try {
+          const p = JSON.parse(atob(t.split('.')[1]));
+          setUser({ email: p.email, role: p.role });
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+    window.addEventListener('auth-changed', handler);
+    return () => window.removeEventListener('auth-changed', handler);
+  }, []);
+
+  return { user, mounted };
+}
+
 export default function Header() {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const cartCount = useCartCount();
+  const { user, mounted } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    document.cookie = 'auth_token=; path=/; max-age=0';
+    document.cookie = 'admin_token=; path=/; max-age=0';
+    window.dispatchEvent(new Event('auth-changed'));
+    router.push('/login');
+  };
+
+  // Don't render auth UI until mounted (prevent hydration mismatch)
+  if (!mounted) {
+    return (
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 4vw', background: 'rgba(250, 250, 248, 0.88)', backdropFilter: 'blur(12px)' }}>
+        <Link href="/" style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', fontWeight: 900, color: 'var(--ink)', textDecoration: 'none' }}>
+          Zylo<span style={{ color: 'var(--red)' }}>.</span>
+        </Link>
+      </nav>
+    );
+  }
 
   return (
     <nav
@@ -142,56 +201,76 @@ export default function Header() {
           </Link>
         </li>
 
-        {/* Profile */}
-        <li>
-          <Link
-            href="/profile"
-            style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-muted)', textDecoration: 'none', transition: 'color 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="6" r="3.5" />
-              <path d="M1.5 16.5c0-4 3.4-7 7.5-7s7.5 3 7.5 7" />
-            </svg>
-          </Link>
-        </li>
-
-        {/* Support */}
-        <li>
-          <Link
-            href="/support"
-            aria-label="Support chat"
-            style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-muted)', textDecoration: 'none', transition: 'color 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3l3 3 3-3h5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
-              <line x1="5" y1="7" x2="13" y2="7" />
-              <line x1="5" y1="10" x2="9" y2="10" />
-            </svg>
-          </Link>
-        </li>
-
-        {/* CTA - Goes to Start Selling flow */}
-        <li>
-          <Link
-            href="/start-selling"
-            style={{
-              background: 'var(--red)', color: 'var(--white)',
-              padding: '0.5rem 1.2rem', borderRadius: 2,
-              fontWeight: 500, fontSize: '0.82rem',
-              letterSpacing: '0.04em', textDecoration: 'none',
-              transition: 'background 0.2s, transform 0.15s',
-              display: 'inline-block',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-deep)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--red)';      e.currentTarget.style.transform = 'translateY(0)';   }}
-          >
-            Start Selling
-          </Link>
-        </li>
+        {user ? (
+          // Logged in: Show Profile, Support, Logout
+          <>
+            <li>
+              <Link
+                href="/profile"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--ink-muted)', textDecoration: 'none', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="6" r="3.5" />
+                  <path d="M1.5 16.5c0-4 3.4-7 7.5-7s7.5 3 7.5 7" />
+                </svg>
+                <span style={{ fontSize: '0.8rem', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.email.split('@')[0]}
+                </span>
+              </Link>
+            </li>
+            <li>
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--ink-muted)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: 4,
+                  transition: 'color 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
+              >
+                Logout
+              </button>
+            </li>
+          </>
+        ) : (
+          // Not logged in: Show Login, Register
+          <>
+            <li>
+              <Link
+                href="/login"
+                style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--ink-muted)', textDecoration: 'none', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-muted)'}
+              >
+                Login
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/register"
+                style={{
+                  background: 'var(--red)', color: 'var(--white)',
+                  padding: '0.5rem 1rem', borderRadius: 2,
+                  fontWeight: 500, fontSize: '0.8rem',
+                  textDecoration: 'none',
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--red-deep)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--red)'}
+              >
+                Register
+              </Link>
+            </li>
+          </>
+        )}
       </ul>
 
       {/* Hamburger (mobile) */}
@@ -239,23 +318,6 @@ export default function Header() {
           ))}
 
           <Link
-            href="/support"
-            onClick={() => setMenuOpen(false)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.6rem',
-              fontSize: '1rem', fontWeight: 400, color: 'var(--ink-muted)',
-              textDecoration: 'none', padding: '0.5rem 0',
-              borderBottom: '1px solid var(--border)',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3l3 3 3-3h5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
-              <line x1="5" y1="7" x2="13" y2="7" /><line x1="5" y1="10" x2="9" y2="10" />
-            </svg>
-            Support
-          </Link>
-
-          <Link
             href="/cart"
             onClick={() => setMenuOpen(false)}
             style={{
@@ -268,18 +330,72 @@ export default function Header() {
             🛒 Cart{cartCount > 0 && ` (${cartCount})`}
           </Link>
 
-          <Link
-            href="/start-selling"
-            onClick={() => setMenuOpen(false)}
-            style={{
-              background: 'var(--red)', color: 'var(--white)',
-              padding: '0.75rem 1.5rem', borderRadius: 2,
-              fontWeight: 500, fontSize: '0.88rem',
-              textDecoration: 'none', textAlign: 'center', marginTop: '0.5rem',
-            }}
-          >
-            Start Selling
-          </Link>
+          {user ? (
+            <>
+              <div style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--ink-faint)' }}>Signed in as</span>
+                <div style={{ fontSize: '0.9rem', color: 'var(--ink)', fontWeight: 500 }}>{user.email}</div>
+              </div>
+              <Link
+                href="/profile"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  fontSize: '1rem', fontWeight: 400, color: 'var(--ink-muted)',
+                  textDecoration: 'none', padding: '0.5rem 0',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                👤 Profile
+              </Link>
+              <Link
+                href="/dashboard"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  fontSize: '1rem', fontWeight: 400, color: 'var(--ink-muted)',
+                  textDecoration: 'none', padding: '0.5rem 0',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                🏪 Seller Dashboard
+              </Link>
+              <button
+                onClick={() => { handleLogout(); setMenuOpen(false); }}
+                style={{
+                  padding: '0.75rem 1rem', background: 'var(--red)', color: 'var(--white)',
+                  border: 'none', borderRadius: 2, cursor: 'pointer',
+                  fontSize: '0.9rem', fontWeight: 500, marginTop: '0.5rem',
+                }}
+              >
+                🚪 Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  fontSize: '1rem', fontWeight: 400, color: 'var(--ink-muted)',
+                  textDecoration: 'none', padding: '0.5rem 0',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                � Login
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  background: 'var(--red)', color: 'var(--white)',
+                  padding: '0.75rem 1.5rem', borderRadius: 2,
+                  fontWeight: 500, fontSize: '0.88rem',
+                  textDecoration: 'none', textAlign: 'center', marginTop: '0.5rem',
+                }}
+              >
+                Create Account
+              </Link>
+            </>
+          )}
         </div>
       )}
 
