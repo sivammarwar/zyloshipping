@@ -105,16 +105,18 @@ export default function RegisterPage() {
     }
   }
 
-  // ── Done screen ───────────────────────────────────────────
-  if (done) {
-    // Auto-redirect to dashboard after 2 seconds
-    useEffect(() => {
+  // Auto-redirect when registration is done
+  useEffect(() => {
+    if (done) {
       const timer = setTimeout(() => {
         router.push('/dashboard');
       }, 2000);
       return () => clearTimeout(timer);
-    }, [router]);
+    }
+  }, [done, router]);
 
+  // ── Done screen ───────────────────────────────────────────
+  if (done) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--off-white)', padding: '2rem', fontFamily: 'var(--sans)' }}>
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
