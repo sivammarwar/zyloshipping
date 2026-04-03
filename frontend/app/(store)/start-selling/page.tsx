@@ -17,7 +17,7 @@ export default function StartSellingPage() {
 
     if (token && user) {
       // User is logged in → go straight to dashboard (store creation lives there)
-      router.push('/dashboard');
+      router.push('/store');
     } else {
       // Not logged in → send to register, then bounce back to dashboard afterwards
       router.push('/register?redirect=/dashboard');
