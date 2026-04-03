@@ -28,6 +28,7 @@ interface StoreStats {
 }
 
 export default function UserDashboard() {
+  const [mounted, setMounted] = useState(false); // FIX: guard against SSR localStorage access
   const [loading, setLoading] = useState(true);
   const [store, setStore] = useState<Store | null>(null);
   const [stats, setStats] = useState<StoreStats | null>(null);
@@ -35,14 +36,22 @@ export default function UserDashboard() {
   const [newStoreName, setNewStoreName] = useState('');
   const router = useRouter();
 
+  // FIX: first useEffect only sets mounted=true (runs client-side only)
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // FIX: auth check runs only after mount, so localStorage is available
+  useEffect(() => {
+    if (!mounted) return;
+
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
     }
     fetchUserStore();
-  }, []);
+  }, [mounted]);
 
   async function fetchUserStore() {
     try {
@@ -55,6 +64,11 @@ export default function UserDashboard() {
         const data = await res.json();
         setStore(data.store);
         setStats(data.stats);
+      } else if (res.status === 401) {
+        // FIX: token is invalid/expired — clear it and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        router.push('/login');
       }
     } catch (err) {
       console.error('Failed to fetch store:', err);
@@ -94,18 +108,29 @@ export default function UserDashboard() {
 
   function handleLogout() {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    document.cookie = 'auth_token=; path=/; max-age=0';
+    document.cookie = 'admin_token=; path=/; max-age=0';
+    window.dispatchEvent(new Event('auth-changed'));
     router.push('/login');
   }
 
-  if (loading) {
+  // FIX: show a neutral loading screen until client is mounted
+  // This prevents the flicker/redirect that happened during hydration
+  if (!mounted || loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
-        <div style={{ fontSize: '1.2rem', color: '#64748b' }}>Loading...</div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', fontFamily: 'var(--sans)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--serif)', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+            Zylo<span style={{ color: '#dc2626' }}>.</span>
+          </div>
+          <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#64748b' }}>Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
 
-  // No store - Show create store prompt
+  // No store — show create store prompt
   if (!store) {
     return (
       <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'var(--sans)' }}>
@@ -142,7 +167,14 @@ export default function UserDashboard() {
               <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.5rem', marginBottom: '1rem' }}>Create Store</h2>
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>Store Name</label>
-                <input type="text" value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} placeholder="My Awesome Store" style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: '1rem' }} />
+                <input
+                  type="text"
+                  value={newStoreName}
+                  onChange={(e) => setNewStoreName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && createStore()}
+                  placeholder="My Awesome Store"
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: '1rem', boxSizing: 'border-box' }}
+                />
               </div>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button onClick={() => setShowCreateModal(false)} style={{ flex: 1, padding: '0.75rem', background: '#f1f5f9', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
@@ -155,7 +187,7 @@ export default function UserDashboard() {
     );
   }
 
-  // Has store - Show dashboard
+  // Has store — show full dashboard
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'var(--sans)' }}>
       <header style={{ background: 'white', padding: '1rem 2rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
