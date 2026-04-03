@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('');
@@ -61,27 +60,11 @@ export default function LoginPage() {
   }
 
   async function handleGoogleLogin() {
-    setSocialLoading('google');
-    setError('');
-    try {
-      await signIn('google', { callbackUrl: '/dashboard' });
-    } catch (err) {
-      console.error('Google login error:', err);
-      setError('Google login failed. Please try again.');
-      setSocialLoading(null);
-    }
+    setError('Google login is temporarily disabled.');
   }
 
   async function handleAppleLogin() {
-    setSocialLoading('apple');
-    setError('');
-    try {
-      await signIn('apple', { callbackUrl: '/dashboard' });
-    } catch (err) {
-      console.error('Apple login error:', err);
-      setError('Apple login failed. Please try again.');
-      setSocialLoading(null);
-    }
+    setError('Apple login is temporarily disabled.');
   }
 
   const SOCIAL = [
