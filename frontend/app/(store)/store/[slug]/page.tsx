@@ -47,10 +47,27 @@ export default function StorePage() {
   async function fetchStore() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://zyloshippingbackend-production.up.railway.app';
-      const res = await fetch(`${apiUrl}/api/user/store/public/${slug}`);
+      const token = localStorage.getItem('token');
       
-      if (!res.ok) {
-        if (res.status === 404) {
+      // Try authenticated endpoint first (for store owners)
+      if (token) {
+        const authRes = await fetch(`${apiUrl}/api/user/store/by-slug/${slug}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (authRes.ok) {
+          const data = await authRes.json();
+          setStore(data.store);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fall back to public endpoint
+      const publicRes = await fetch(`${apiUrl}/api/user/store/public/${slug}`);
+      
+      if (!publicRes.ok) {
+        if (publicRes.status === 404) {
           setError('Store not found');
         } else {
           setError('Failed to load store');
@@ -59,7 +76,7 @@ export default function StorePage() {
         return;
       }
       
-      const data = await res.json();
+      const data = await publicRes.json();
       setStore(data.store);
     } catch (err) {
       console.error('Error fetching store:', err);

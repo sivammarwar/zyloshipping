@@ -274,4 +274,77 @@ router.get('/public/:slug', async (req, res) => {
   }
 });
 
+// GET /api/user/store/by-slug/:slug - Get store by slug (owner only, no public requirement)
+router.get('/by-slug/:slug', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const store = await prisma.store.findUnique({
+      where: { slug },
+      include: {
+        products: {
+          where: { isActive: true },
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                price: true,
+                compareAtPrice: true,
+                images: true,
+                category: true,
+                rating: true,
+                reviewCount: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+
+    // Only allow owner to access
+    if (store.ownerId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    res.json({
+      store: {
+        id: store.id,
+        name: store.name,
+        slug: store.slug,
+        description: store.description,
+        logo: store.logo,
+        isPublic: store.isPublic,
+        currency: store.currency,
+        products: store.products.map((sp: any) => ({
+          id: sp.product.id,
+          name: sp.product.name,
+          slug: sp.product.slug,
+          description: sp.product.description,
+          price: sp.price || sp.product.price,
+          compareAtPrice: sp.compareAtPrice || sp.product.compareAtPrice,
+          images: sp.images || sp.product.images,
+          category: sp.category || sp.product.category,
+          rating: sp.product.rating,
+          reviewCount: sp.product.reviewCount,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching store by slug:', error);
+    res.status(500).json({ error: 'Failed to fetch store' });
+  }
+});
+
 export default router;
