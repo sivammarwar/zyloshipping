@@ -110,11 +110,11 @@ export default function RegisterPage() {
     }
   }
 
-  // Auto-redirect when registration is done
+  // Auto-redirect after registration
   useEffect(() => {
     if (done) {
       const timer = setTimeout(() => {
-        router.push('/dashboard');
+        router.push('/');
       }, 2000);
       return () => clearTimeout(timer);
     }
@@ -144,10 +144,10 @@ export default function RegisterPage() {
               Welcome to ZyloShipping, <strong>{firstName}</strong>. Your account is ready.
             </p>
             <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', marginBottom: '2.5rem' }}>
-              Redirecting to your dashboard...
+              Redirecting to home page...
             </p>
-            <Link href="/dashboard" style={{ padding: '0.8rem 2rem', background: 'var(--red)', color: 'var(--white)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500, fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.25)' }}>
-              Go to dashboard →
+            <Link href="/" style={{ padding: '0.8rem 2rem', background: 'var(--red)', color: 'var(--white)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500, fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.25)' }}>
+              Browse products →
             </Link>
           </div>
         </div>

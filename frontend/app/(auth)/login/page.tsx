@@ -46,7 +46,7 @@ export default function LoginPage() {
         document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         const params   = new URLSearchParams(window.location.search);
-        const redirect = params.get('redirect') || '/dashboard';
+        const redirect = params.get('redirect') || '/';
         window.location.href = redirect;
       } else {
         setError('Login failed. Please try again.');
