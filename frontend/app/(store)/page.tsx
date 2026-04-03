@@ -631,7 +631,7 @@ export default function HomePage() {
         </p>
         <div className="reveal reveal-delay-2" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link
-            href="/dashboard"
+            href="/start-selling"
             style={{
               background: 'var(--white)',
               color: 'var(--red)',

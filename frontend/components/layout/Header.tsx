@@ -174,10 +174,10 @@ export default function Header() {
           </Link>
         </li>
 
-        {/* CTA - Goes to User Dashboard */}
+        {/* CTA - Goes to Start Selling flow */}
         <li>
           <Link
-            href="/dashboard"
+            href="/start-selling"
             style={{
               background: 'var(--red)', color: 'var(--white)',
               padding: '0.5rem 1.2rem', borderRadius: 2,
@@ -269,7 +269,7 @@ export default function Header() {
           </Link>
 
           <Link
-            href="/dashboard"
+            href="/start-selling"
             onClick={() => setMenuOpen(false)}
             style={{
               background: 'var(--red)', color: 'var(--white)',
