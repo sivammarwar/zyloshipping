@@ -47,7 +47,8 @@ export default function UserDashboard() {
   async function fetchUserStore() {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/user/store', {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://zyloshippingbackend-production.up.railway.app';
+      const res = await fetch(`${apiUrl}/api/user/store`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -67,7 +68,8 @@ export default function UserDashboard() {
     
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/user/store', {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://zyloshippingbackend-production.up.railway.app';
+      const res = await fetch(`${apiUrl}/api/user/store`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,6 +83,9 @@ export default function UserDashboard() {
         setStore(data.store);
         setShowCreateModal(false);
         setNewStoreName('');
+      } else {
+        const errorData = await res.json().catch(() => null);
+        console.error('Failed to create store:', errorData || res.statusText);
       }
     } catch (err) {
       console.error('Failed to create store:', err);
