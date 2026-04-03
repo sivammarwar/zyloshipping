@@ -26,7 +26,13 @@ export default function RegisterPage() {
   const [step, setStep]           = useState<Step>(1);
   const [loading, setLoading]     = useState(false);
   const [done, setDone]           = useState(false);
+  const [mounted, setMounted]     = useState(false);
   const router = useRouter();
+
+  // Prevent hydration mismatch by waiting for mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Step 1 fields
   const [firstName, setFirstName] = useState('');
@@ -117,8 +123,18 @@ export default function RegisterPage() {
 
   return (
     <>
-      {/* Done Screen */}
-      {done && (
+      {!mounted ? (
+        // Loading placeholder - same on server and client
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--off-white)' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'var(--serif)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--ink)' }}>
+              Zylo<span style={{ color: 'var(--red)' }}>.</span>
+            </div>
+            <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--ink-muted)' }}>Loading...</p>
+          </div>
+        </div>
+      ) : done ? (
+        // Done Screen
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--off-white)', padding: '2rem', fontFamily: 'var(--sans)' }}>
           <div style={{ textAlign: 'center', maxWidth: 420 }}>
             <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', boxShadow: '0 8px 32px rgba(196,30,58,0.3)' }}>
@@ -136,10 +152,8 @@ export default function RegisterPage() {
             </Link>
           </div>
         </div>
-      )}
-
-      {/* Registration Form */}
-      {!done && (
+      ) : (
+        // Registration Form
     <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr', fontFamily: 'var(--sans)' }}>
 
       {/* ── Left panel ── */}
@@ -316,7 +330,7 @@ export default function RegisterPage() {
         }
       `}</style>
     </div>
-      )}
+    )}
     </>
   );
 }
