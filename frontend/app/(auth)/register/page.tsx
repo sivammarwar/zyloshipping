@@ -102,6 +102,9 @@ export default function RegisterPage() {
       document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
       document.cookie = `admin_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
+      // FIX 1: Notify header and other components about auth change (was missing!)
+      window.dispatchEvent(new Event('auth-changed'));
+
       setLoading(false);
       setDone(true);
     } catch (err) {
@@ -113,8 +116,11 @@ export default function RegisterPage() {
   // Auto-redirect after registration
   useEffect(() => {
     if (done) {
+      // FIX 2: Respect the ?redirect query param (e.g. from /start-selling → /dashboard)
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect') || '/';
       const timer = setTimeout(() => {
-        router.push('/');
+        router.push(redirect);
       }, 2000);
       return () => clearTimeout(timer);
     }
@@ -144,7 +150,7 @@ export default function RegisterPage() {
               Welcome to ZyloShipping, <strong>{firstName}</strong>. Your account is ready.
             </p>
             <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', marginBottom: '2.5rem' }}>
-              Redirecting to home page...
+              Redirecting you now...
             </p>
             <Link href="/" style={{ padding: '0.8rem 2rem', background: 'var(--red)', color: 'var(--white)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500, fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.25)' }}>
               Browse products →
