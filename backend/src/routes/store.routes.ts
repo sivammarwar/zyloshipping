@@ -206,36 +206,18 @@ router.patch('/', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-// GET /api/stores/:slug - Get public store by slug (no auth required)
+// GET /api/user/store/public/:slug - Get public store by slug (no auth required)
 router.get('/public/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
     
+    // Get store with owner
     const store = await prisma.store.findUnique({
       where: { slug },
       include: {
         owner: {
           select: {
             name: true,
-          },
-        },
-        products: {
-          where: { isActive: true },
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                description: true,
-                price: true,
-                compareAtPrice: true,
-                images: true,
-                category: true,
-                rating: true,
-                reviewCount: true,
-              },
-            },
           },
         },
       },
@@ -245,6 +227,27 @@ router.get('/public/:slug', async (req, res) => {
       return res.status(404).json({ error: 'Store not found' });
     }
 
+    // Get store products separately with proper relations
+    const storeProducts = await prisma.storeProduct.findMany({
+      where: { storeId: store.id },
+      include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            description: true,
+            price: true,
+            compareAtPrice: true,
+            imagesJson: true,
+            category: true,
+            rating: true,
+            totalSales: true,
+          },
+        },
+      },
+    });
+
     res.json({
       store: {
         id: store.id,
@@ -252,19 +255,19 @@ router.get('/public/:slug', async (req, res) => {
         slug: store.slug,
         description: store.description,
         logo: store.logo,
-        ownerName: store.owner.name,
+        ownerName: store.owner?.name || 'Unknown',
         currency: store.currency,
-        products: store.products.map((sp: any) => ({
+        products: storeProducts.map((sp) => ({
           id: sp.product.id,
-          name: sp.product.name,
+          name: sp.product.title,
           slug: sp.product.slug,
           description: sp.product.description,
           price: sp.price || sp.product.price,
           compareAtPrice: sp.compareAtPrice || sp.product.compareAtPrice,
-          images: sp.images || sp.product.images,
+          images: sp.imagesJson || sp.product.imagesJson,
           category: sp.category || sp.product.category,
           rating: sp.product.rating,
-          reviewCount: sp.product.reviewCount,
+          reviewCount: sp.product.totalSales,
         })),
       },
     });
@@ -284,29 +287,9 @@ router.get('/by-slug/:slug', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
+    // Get store
     const store = await prisma.store.findUnique({
       where: { slug },
-      include: {
-        products: {
-          where: { isActive: true },
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                description: true,
-                price: true,
-                compareAtPrice: true,
-                images: true,
-                category: true,
-                rating: true,
-                reviewCount: true,
-              },
-            },
-          },
-        },
-      },
     });
 
     if (!store) {
@@ -318,6 +301,27 @@ router.get('/by-slug/:slug', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Get store products separately
+    const storeProducts = await prisma.storeProduct.findMany({
+      where: { storeId: store.id },
+      include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            description: true,
+            price: true,
+            compareAtPrice: true,
+            imagesJson: true,
+            category: true,
+            rating: true,
+            totalSales: true,
+          },
+        },
+      },
+    });
+
     res.json({
       store: {
         id: store.id,
@@ -327,17 +331,17 @@ router.get('/by-slug/:slug', authMiddleware, async (req: AuthRequest, res) => {
         logo: store.logo,
         isPublic: store.isPublic,
         currency: store.currency,
-        products: store.products.map((sp: any) => ({
+        products: storeProducts.map((sp) => ({
           id: sp.product.id,
-          name: sp.product.name,
+          name: sp.product.title,
           slug: sp.product.slug,
           description: sp.product.description,
           price: sp.price || sp.product.price,
           compareAtPrice: sp.compareAtPrice || sp.product.compareAtPrice,
-          images: sp.images || sp.product.images,
+          images: sp.imagesJson || sp.product.imagesJson,
           category: sp.category || sp.product.category,
           rating: sp.product.rating,
-          reviewCount: sp.product.reviewCount,
+          reviewCount: sp.product.totalSales,
         })),
       },
     });
