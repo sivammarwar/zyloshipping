@@ -27,17 +27,16 @@ const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }>
   draft:  { label: 'Draft',     color: '#7c3aed', bg: '#f5f3ff' },
 };
 
-const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard',           icon: '◈' },
-  { label: 'Orders',    href: '/dashboard/orders',    icon: '📦' },
-  { label: 'Products',  href: '/dashboard/products',  icon: '🏷', active: true },
-  { label: 'Suppliers', href: '/dashboard/suppliers', icon: '🔗' },
+// Seller navigation - NO AI Agents, NO Suppliers (admin-only features)
+const SELLER_NAV = [
+  { label: 'Dashboard', href: '/dashboard', icon: '◈' },
+  { label: 'Orders', href: '/dashboard/orders', icon: '📦' },
+  { label: 'Products', href: '/dashboard/products', icon: '🏷', active: true },
   { label: 'Analytics', href: '/dashboard/analytics', icon: '📊' },
-  { label: 'AI Agents', href: '/dashboard/agents',    icon: '🤖' },
-  { label: 'Settings',  href: '/dashboard/settings',  icon: '⚙️' },
+  { label: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
 ];
 
-export default function AdminProductsPage() {
+export default function SellerProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
   const [suppliers, setSuppliers] = useState<string[]>(['All']);
@@ -131,8 +130,8 @@ export default function AdminProductsPage() {
           </div>
           {sidebarOpen && <span style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 900, color: 'white', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>Zylo<span style={{ color: 'var(--red)' }}>.</span></span>}
         </div>
-        <nav style={{ flex: 1, padding: '1rem 0', overflowY: 'auto' }}>
-          {NAV_ITEMS.map(item => (
+        <nav style={{ flex: 1, padding: '1rem 0' }}>
+          {SELLER_NAV.map(item => (
             <Link key={item.href} href={item.href} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem 1.25rem', color: item.active ? 'var(--white)' : 'rgba(255,255,255,0.45)', background: item.active ? 'rgba(196,30,58,0.18)' : 'transparent', borderLeft: `3px solid ${item.active ? 'var(--red)' : 'transparent'}`, textDecoration: 'none', fontSize: '0.84rem', fontWeight: item.active ? 500 : 300, transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
               <span style={{ fontSize: '1rem', flexShrink: 0 }}>{item.icon}</span>
               {sidebarOpen && item.label}
@@ -149,7 +148,7 @@ export default function AdminProductsPage() {
         {/* Top bar */}
         <div style={{ background: 'var(--white)', borderBottom: '1px solid var(--border)', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 40, gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--red)' }}>Admin</div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--red)' }}>Seller</div>
             <h1 style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.02em' }}>Products</h1>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
