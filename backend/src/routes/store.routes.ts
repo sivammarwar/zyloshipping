@@ -231,20 +231,7 @@ router.get('/public/:slug', async (req, res) => {
     const storeProducts = await prisma.storeProduct.findMany({
       where: { storeId: store.id },
       include: {
-        product: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            description: true,
-            price: true,
-            compareAtPrice: true,
-            imagesJson: true,
-            category: true,
-            rating: true,
-            totalSales: true,
-          },
-        },
+        product: true,
       },
     });
 
@@ -257,15 +244,15 @@ router.get('/public/:slug', async (req, res) => {
         logo: store.logo,
         ownerName: store.owner?.name || 'Unknown',
         currency: store.currency,
-        products: storeProducts.map((sp) => ({
+        products: storeProducts.map((sp: any) => ({
           id: sp.product.id,
           name: sp.product.title,
           slug: sp.product.slug,
           description: sp.product.description,
-          price: sp.price || sp.product.price,
-          compareAtPrice: sp.compareAtPrice || sp.product.compareAtPrice,
-          images: sp.imagesJson || sp.product.imagesJson,
-          category: sp.category || sp.product.category,
+          price: sp.customPrice || sp.product.price,
+          compareAtPrice: sp.product.compareAtPrice,
+          images: sp.product.imagesJson,
+          category: sp.product.category,
           rating: sp.product.rating,
           reviewCount: sp.product.totalSales,
         })),
@@ -305,20 +292,7 @@ router.get('/by-slug/:slug', authMiddleware, async (req: AuthRequest, res) => {
     const storeProducts = await prisma.storeProduct.findMany({
       where: { storeId: store.id },
       include: {
-        product: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            description: true,
-            price: true,
-            compareAtPrice: true,
-            imagesJson: true,
-            category: true,
-            rating: true,
-            totalSales: true,
-          },
-        },
+        product: true,
       },
     });
 
@@ -331,15 +305,15 @@ router.get('/by-slug/:slug', authMiddleware, async (req: AuthRequest, res) => {
         logo: store.logo,
         isPublic: store.isPublic,
         currency: store.currency,
-        products: storeProducts.map((sp) => ({
+        products: storeProducts.map((sp: any) => ({
           id: sp.product.id,
           name: sp.product.title,
           slug: sp.product.slug,
           description: sp.product.description,
-          price: sp.price || sp.product.price,
-          compareAtPrice: sp.compareAtPrice || sp.product.compareAtPrice,
-          images: sp.imagesJson || sp.product.imagesJson,
-          category: sp.category || sp.product.category,
+          price: sp.customPrice || sp.product.price,
+          compareAtPrice: sp.product.compareAtPrice,
+          images: sp.product.imagesJson,
+          category: sp.product.category,
           rating: sp.product.rating,
           reviewCount: sp.product.totalSales,
         })),
