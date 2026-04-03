@@ -2,22 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getToken, isTokenExpired, removeToken, getTokenPayload } from '@/lib/tokenManager';
-import { UserRole, isAdmin } from '@/lib/auth/roles';
-
-interface TokenPayload {
-  id: string;
-  email: string;
-  role: UserRole;
-  exp: number;
-}
+import { getToken, isTokenExpired, removeToken } from '@/lib/tokenManager';
 
 /**
- * AdminGuard - Protects admin-only routes
+ * SellerGuard - Protects seller dashboard routes
  * Redirects to login if not authenticated
- * Redirects to home if authenticated but not an admin
+ * Any authenticated user can access seller routes (they just need to create a store)
  */
-export default function AdminGuard({ children }: { children: React.ReactNode }) {
+export default function SellerGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
@@ -32,17 +24,10 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // Check if user has admin role
-    const payload = getTokenPayload(token) as TokenPayload | null;
-    if (!payload || !isAdmin(payload.role)) {
-      // User is authenticated but not an admin - redirect to home
-      router.replace('/');
-      return;
-    }
-
     // Sync cookie for middleware
     const maxAge = 60 * 60 * 24 * 7;
     document.cookie = `admin_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    document.cookie = `auth_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
     setReady(true);
   }, [router, pathname]);
 

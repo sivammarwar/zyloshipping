@@ -1,5 +1,5 @@
-import AdminGuard from '@/components/auth/AdminGuard';
+import SellerGuard from '@/components/auth/SellerGuard';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <AdminGuard>{children}</AdminGuard>;
+export default function SellerLayout({ children }: { children: React.ReactNode }) {
+  return <SellerGuard>{children}</SellerGuard>;
 }

@@ -13,11 +13,14 @@ interface TokenPayload {
 }
 
 /**
- * AdminGuard - Protects admin-only routes
+ * BuyerGuard - Protects buyer-only routes
  * Redirects to login if not authenticated
- * Redirects to home if authenticated but not an admin
+ * Redirects admin/seller users to their respective dashboards
+ * 
+ * Use this for routes that should only be accessible to regular buyers
+ * (e.g., checkout, profile, orders history)
  */
-export default function AdminGuard({ children }: { children: React.ReactNode }) {
+export default function BuyerGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
@@ -32,17 +35,17 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // Check if user has admin role
+    // Get user role
     const payload = getTokenPayload(token) as TokenPayload | null;
-    if (!payload || !isAdmin(payload.role)) {
-      // User is authenticated but not an admin - redirect to home
-      router.replace('/');
+    if (!payload) {
+      removeToken();
+      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 
     // Sync cookie for middleware
     const maxAge = 60 * 60 * 24 * 7;
-    document.cookie = `admin_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    document.cookie = `auth_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
     setReady(true);
   }, [router, pathname]);
 

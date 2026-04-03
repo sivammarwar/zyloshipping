@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getUserFromToken } from '@/lib/tokenManager';
+import { isAdmin, UserRole } from '@/lib/auth/roles';
 
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
@@ -145,9 +146,10 @@ export function MobileNav() {
           }}>
             {user ? (
               <>
-                {user.role === 'ADMIN' && (
+                {/* Show Admin link only for ADMIN or OWNER roles */}
+                {isAdmin(user.role as UserRole) && (
                   <Link
-                    href="/dashboard"
+                    href="/adminsiva"
                     onClick={() => setIsOpen(false)}
                     style={{
                       display: 'block', padding: '0.75rem 1rem',
@@ -158,6 +160,18 @@ export function MobileNav() {
                     ⚙️ Admin Dashboard
                   </Link>
                 )}
+                {/* Show Seller Dashboard link for all authenticated users */}
+                <Link
+                  href="/dashboard"
+                  onClick={() => setIsOpen(false)}
+                  style={{
+                    display: 'block', padding: '0.75rem 1rem',
+                    textDecoration: 'none', color: 'var(--ink-muted)',
+                    fontSize: '0.88rem', fontFamily: 'var(--sans)', borderRadius: 6,
+                  }}
+                >
+                  🏪 Seller Dashboard
+                </Link>
                 <button
                   onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
                   style={{
