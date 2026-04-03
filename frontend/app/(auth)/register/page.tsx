@@ -115,30 +115,31 @@ export default function RegisterPage() {
     }
   }, [done, router]);
 
-  // ── Done screen ───────────────────────────────────────────
-  if (done) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--off-white)', padding: '2rem', fontFamily: 'var(--sans)' }}>
-        <div style={{ textAlign: 'center', maxWidth: 420 }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', boxShadow: '0 8px 32px rgba(196,30,58,0.3)' }}>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 16l7 7L27 9"/></svg>
-          </div>
-          <h1 style={{ fontFamily: 'var(--serif)', fontSize: '2.2rem', fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.025em', marginBottom: '0.75rem' }}>You&apos;re in!</h1>
-          <p style={{ fontSize: '0.92rem', color: 'var(--ink-muted)', fontWeight: 300, marginBottom: '0.5rem' }}>
-            Welcome to ZyloShipping, <strong>{firstName}</strong>. Your account is ready.
-          </p>
-          <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', marginBottom: '2.5rem' }}>
-            Redirecting to your dashboard...
-          </p>
-          <Link href="/dashboard" style={{ padding: '0.8rem 2rem', background: 'var(--red)', color: 'var(--white)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500, fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.25)' }}>
-            Go to dashboard →
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
+    <>
+      {/* Done Screen */}
+      {done && (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--off-white)', padding: '2rem', fontFamily: 'var(--sans)' }}>
+          <div style={{ textAlign: 'center', maxWidth: 420 }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', boxShadow: '0 8px 32px rgba(196,30,58,0.3)' }}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 16l7 7L27 9"/></svg>
+            </div>
+            <h1 style={{ fontFamily: 'var(--serif)', fontSize: '2.2rem', fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.025em', marginBottom: '0.75rem' }}>You&apos;re in!</h1>
+            <p style={{ fontSize: '0.92rem', color: 'var(--ink-muted)', fontWeight: 300, marginBottom: '0.5rem' }}>
+              Welcome to ZyloShipping, <strong>{firstName}</strong>. Your account is ready.
+            </p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', marginBottom: '2.5rem' }}>
+              Redirecting to your dashboard...
+            </p>
+            <Link href="/dashboard" style={{ padding: '0.8rem 2rem', background: 'var(--red)', color: 'var(--white)', borderRadius: 2, textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500, fontFamily: 'var(--sans)', boxShadow: '0 4px 18px rgba(196,30,58,0.25)' }}>
+              Go to dashboard →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Registration Form */}
+      {!done && (
     <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr', fontFamily: 'var(--sans)' }}>
 
       {/* ── Left panel ── */}
@@ -315,5 +316,7 @@ export default function RegisterPage() {
         }
       `}</style>
     </div>
+      )}
+    </>
   );
 }
