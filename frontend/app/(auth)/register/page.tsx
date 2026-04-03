@@ -95,6 +95,7 @@ export default function RegisterPage() {
 
       // Save token and user data (auto-login)
       localStorage.setItem('token', data.token);
+      localStorage.setItem('auth_token', data.token); // tokenManager uses this key
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Set auth cookies

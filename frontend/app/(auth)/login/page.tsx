@@ -35,14 +35,14 @@ export default function LoginPage() {
       if (data.token) {
         const maxAge = 60 * 60 * 24 * 7; // 7 days
 
-        // Store in localStorage
+        // Store in localStorage using BOTH keys for compatibility
         localStorage.setItem('token', data.token);
+        localStorage.setItem('auth_token', data.token); // tokenManager uses this key
 
         // Set admin_token cookie so middleware protects /dashboard routes
         document.cookie = `admin_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         // Also set auth_token cookie so middleware protects store user routes
-        // (covers the case where the same login page is used for both roles)
         document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         // Notify header and other components about auth change

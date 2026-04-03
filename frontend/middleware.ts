@@ -74,6 +74,7 @@ export const config = {
   matcher: [
     '/adminsiva/:path*',
     '/dashboard/:path*',
+    '/profile',
     '/profile/:path*',
     '/orders/:path*',
     '/settings/:path*',
