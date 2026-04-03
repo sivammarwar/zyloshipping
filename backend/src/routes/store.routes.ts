@@ -206,4 +206,72 @@ router.patch('/', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// GET /api/stores/:slug - Get public store by slug (no auth required)
+router.get('/public/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    
+    const store = await prisma.store.findUnique({
+      where: { slug },
+      include: {
+        owner: {
+          select: {
+            name: true,
+          },
+        },
+        products: {
+          where: { isActive: true },
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                price: true,
+                compareAtPrice: true,
+                images: true,
+                category: true,
+                rating: true,
+                reviewCount: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!store || !store.isPublic) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+
+    res.json({
+      store: {
+        id: store.id,
+        name: store.name,
+        slug: store.slug,
+        description: store.description,
+        logo: store.logo,
+        ownerName: store.owner.name,
+        currency: store.currency,
+        products: store.products.map((sp: any) => ({
+          id: sp.product.id,
+          name: sp.product.name,
+          slug: sp.product.slug,
+          description: sp.product.description,
+          price: sp.price || sp.product.price,
+          compareAtPrice: sp.compareAtPrice || sp.product.compareAtPrice,
+          images: sp.images || sp.product.images,
+          category: sp.category || sp.product.category,
+          rating: sp.product.rating,
+          reviewCount: sp.product.reviewCount,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching public store:', error);
+    res.status(500).json({ error: 'Failed to fetch store' });
+  }
+});
+
 export default router;
